@@ -1,0 +1,15 @@
+# dsh-work-icon bundle patch
+# 让 DSH 的 profile 在加载本插件包时把宿主侧插件行插进 composition。
+# 与 package.json 的 `dsh.bundle.patch` 指向同一个文件。
+#
+# enabled: true  —— 安装后即启用。
+#                  窗口实现是 runtime/electron/（Electron 置顶窗），由宿主零参数 spawn。
+# includeSubagents: false —— 这里写的是【默认值】。宿主启动时按"只有非默认值才算显式意图"
+#                            的规则合并（mergeStartupConfig），所以用户 config.json 里的
+#                            真实取值【不会被这一行盖掉】。
+- insert:
+    - id: dsh-work-icon
+      name: dsh-work-icon
+      config:
+        enabled: true
+        includeSubagents: false

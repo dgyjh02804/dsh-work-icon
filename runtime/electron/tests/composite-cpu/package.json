@@ -1,0 +1,7 @@
+{
+  "name": "composite-cpu-harness",
+  "version": "1.0.0",
+  "private": true,
+  "description": "回答：只走合成层的持续动效，CPU 是否≈静止？（设计验证用，非生产代码）",
+  "main": "main.js"
+}

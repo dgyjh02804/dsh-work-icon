@@ -1,0 +1,2149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:">
+<title>DSH 工作图标 · H2 等离云核</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;
+    -webkit-user-select:none;user-select:none;cursor:default}
+  body.bg-dark{background:#111111}
+  body.bg-white{background:#ffffff}
+
+  /* ===== 底板深浅档 + 配套文字档（2026-09-19；用户要求「我希望这个底更浅」）=====
+     为什么"底"和"字色"必须一起分档：底变浅 ⇒ 白字的对比度直接往下掉。
+     每一档的文字色都用**像素口径**重新配过（tests/panel-lightness.mjs：笔画像素 vs 按实测 alpha
+     合成到用户真实壁纸之后的底），门槛是每档最差的一条 ≥4.5:1（小字）。
+     口径与约束（一条都不许丢）：
+       · 档位只改**底板的四段渐变 RGB**与**承载文字的颜色**；α 仍**只**由主进程的
+         `--panel-alpha` 控制（窗口侧不写死透明度，window.panelAlpha 的语义不变）。
+       · 分区色的**图形档一个字节都不动**（圆点 #56d9c8 / 刻度 / 竖条 / 描边 / `.sec` 边框），
+         用户口径「区分色可以保留」——变浅时只把**当文字用的**分区色按色相不变、只提亮度处理。
+       · `#p0..p3` 是 "r,g,b" 三元组，供 `rgba(var(--pN), α)` 文本代入。
+     档位由渲染层加在 <body> 上（`body.plate-a|b|c`）；生产默认档见 JS 常量 PLATE_TIER，
+     取证通道是既有的 `--bg`：`--bg plate-a|plate-b|plate-c`（生产路径永不出现）。 */
+  body{--p0:24,41,63;--p1:18,33,52;--p2:15,28,44;--p3:11,21,33;
+    --ink:#dbe6f2;--ink2:#e8f0fa;--ink3:#eef4fa;--ink4:#e6eefa;--ink5:#f4f8fa;--act:#7fe3c8;--met:#9ad4ff}
+  /* 档 a：只把"下半的深"拉平（顶部几乎不动），字色只微提一档 —— 改动最小的一档 */
+  body.plate-a{--p0:26,42,62;--p1:23,38,57;--p2:21,35,53;--p3:19,32,47;
+    --ink:#e8f0fa;--ink2:#eef4fa;--ink3:#f2f6fb;--ink4:#eef4fa;--ink5:#f6fafd;--act:#9deed6;--met:#b8dfff}
+  /* 档 b：整体提一档并拉平（浅色壁纸下明显更浅），字色提一档 */
+  body.plate-b{--p0:36,55,80;--p1:33,51,75;--p2:31,48,71;--p3:29,45,66;
+    --ink:#eef4fa;--ink2:#f4f8fc;--ink3:#f7fbff;--ink4:#f2f6fb;--ink5:#f8fbfd;--act:#b6f4e4;--met:#cfe9ff}
+  /* 档 c：最浅（底接近"石板蓝"）。到这档文字必须近白，分区色的**身份靠图形档保留**（边框/圆点/刻度不变） */
+  body.plate-c{--p0:44,66,94;--p1:40,60,87;--p2:38,57,83;--p3:36,54,78;
+    --ink:#f6fafd;--ink2:#f8fbfe;--ink3:#fafdff;--ink4:#f6fafd;--ink5:#fbfdff;--act:#c9f9ec;--met:#e0f2ff}
+
+  /* ===== 窗口侧主题（可调量）—— 2026-09-19 任务 F =====
+     落盘在**窗口侧自己的文件** `~/.dsh/work-icon/theme.json`（**绝不写宿主的 config.json**：
+     本项目踩过"窗口侧把宿主配置文件覆盖掉、把用户勾选态清空"的坑，两个真相源不许混）。
+     这五个量由右键菜单「配色设置…」打开的独立设置窗口驱动，走**同一个 Electron 实例的 IPC**实时下发，
+     不经 DSH 宿主的 stdio 协议（那条路上有宿主自己的持久化与回写逻辑，会跟这里打架）。
+     默认值 = 用户当前看到的形态（悬浮板底色 α=0 = 全删；大面板 α=0.78 = 保留）。 */
+  body{--hover-plate-a:0;        /* 悬浮信息板底色深浅：0 = 无底无框（默认） */
+       --panel-opacity:1;        /* 大面板整体不透明度 */
+       --text-boost:1;           /* 文字亮度（filter:brightness；1 = 不改） */
+       --icon-bright:1}          /* 图标亮度（1 = 不改） */
+  /* 以下几档只在**真的调过**（body.tuned）时挂上：默认路径一个字节都不变（黄金样本/取色口径不受影响） */
+  /* ⚠️ `#v2panel {` 的 `{` 前**故意留一个空格**：tests/v2.mjs 的 W7 用文本匹配 `/#v2panel\{[^}]*/` 取
+     "`#v2panel` 那条规则"，不留空格的话它会先命中这里（本条规则里没有 z-index）⇒ 假红。
+     规则语义一个字没变，只是不让文本匹配误伤。 */
+  body.tuned #plateInner,body.tuned #v2panel {filter:brightness(var(--text-boost,1))}
+  body.tuned #v2hover .st,body.tuned #v2hover .h3,body.tuned #v2hover .bl{filter:brightness(var(--text-boost,1))}
+  body.tuned #zoom{filter:brightness(var(--icon-bright,1))}
+
+  /* ===== SPEC 第 4 节 七态配色（逐项照抄，不得优化） ===== */
+  .st-IDLE        {--c1:#3d7688;--c2:#1b3b47;--glow:rgba(80,190,220,.20);--core:.13}
+  .st-THINKING    {--c1:#38e8ff;--c2:#176c85;--glow:rgba(56,232,255,.55);--core:.42}
+  .st-WORKING     {--c1:#5cffd0;--c2:#128f78;--glow:rgba(92,255,208,.62);--core:1}
+  .st-WAITING     {--c1:#ffb340;--c2:#a35a08;--glow:rgba(255,179,64,.62);--core:.55}
+  .st-SUCCESS     {--c1:#8dffae;--c2:#1f9b5a;--glow:rgba(141,255,174,.55);--core:1}
+  .st-ERROR       {--c1:#ff4d6d;--c2:#8e0f2a;--glow:rgba(255,77,109,.62);--core:.7}
+  .st-DISCONNECTED{--c1:#5a636e;--c2:#2b3138;--glow:rgba(140,150,160,.16);--core:.2}
+
+  /* ===== 布局 ===== */
+  /* 关闭态/截图态：整窗居中 —— 与改动前逐像素一致（黄金样本、旋转取证都吃这条）
+     面板展开时才切到"钉在顶部图标区"的布局，否则图标会跟着变高的窗口一起居中跑掉 */
+  #stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  body.panel-open #stage{inset:auto;left:0;right:0;top:0;height:var(--icon-win,210px)}
+  #zoom{transition:transform 150ms ease-out;transform-origin:50% 50%}
+  #stage.hot #zoom{transform:scale(1.06)}
+  #shk{display:block}
+  #ico{display:block;transition:filter 300ms linear}
+  /* ===== 图标下的两行文字（2026-09-19 用户拍板）=====
+     第 1 行 #lab ：状态 · 活动 · 词元（原样，只是位置上移了 8px，见下）
+     第 2 行 #lab2：代理指标「轮数 · 工具数」—— 用户原话「换到图标下面那行青色文字的下面」，
+                   从悬浮层 #v2hover 里**搬过来**（不是复制：那边已删除），**样式沿用 #lab**。
+     为什么要动 #lab 的 top（-20px → -28px）：hot 时图标 `#zoom` 是 scale(1.06)，
+     实测下沿 181.3px，而窗口（`--icon-win`）只有 210px ⇒ 图标下只剩 ~29px，
+     两行 12.5px 必须挤在 181.4~210 之间，不动 #lab 就会把第二行顶到窗口外被裁掉
+     （本项目踩过"内容被窗口裁切"的坑：#v2hover 实测 288px 宽而窗口只有 210 ⇒ 右侧被裁 78px）。
+     两行共用同一个声明块 ⇒ 字体/字号/颜色/阴影/透明度**逐属性相同**，不存在"另配一套样式"。 */
+  #lab,#lab2{position:absolute;left:0;right:0;text-align:center;white-space:nowrap;
+    font:400 10px/1.25 ui-monospace,Consolas,"Courier New",monospace;
+    color:var(--c1,#cfe4ee);opacity:0;transition:opacity 140ms linear;
+    text-shadow:0 0 4px rgba(0,0,0,.85),0 1px 2px rgba(0,0,0,.9)}
+  #lab{top:calc(var(--icon-win,210px) - 28px)}
+  #lab2{top:calc(var(--icon-win,210px) - 15.5px)}
+  #stage.hot #lab,#stage.hot #lab2{opacity:.92}
+  /* 互斥：完整面板开着时，悬停**不再**显示轻量面板（内容会打架） */
+  body.panel-open #lab,body.panel-open #lab2{opacity:0 !important}
+  body.panel-open #stage.hot #zoom{transform:none}
+  body.shot #lab,body.shot #lab2{display:none}
+
+  /* ===== 完整面板（③-2 定稿：440 宽 / 底板 α 可调；本轮 α 由主进程 PANEL_ALPHA 下发）=====
+     ① 底读作"深蓝"而非"发蓝的黑"：四段渐变 + 网格 + 斜向高光 + 顶部内高光
+     ② 文字一律不发光（无 text-shadow / 无 drop-shadow），靠色相与清晰度区分
+     ③ 青只是 5 个分区色之一（青=动作 / 金=花费 / 淡蓝=度量 / 紫=任务 / 冷灰=思考） */
+  #panel{position:absolute;inset:0;opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity 120ms linear,visibility 0s linear 120ms}
+  /* 面板打开时**必须**能被鼠标点到（用户 2026-09-13 拍板：面板是可交互的，要能拖右侧滚动条）。
+     窗口侧同时把命中判据从"只有图标圆"扩到"图标圆 ∪ 面板可见矩形"；
+     两处缺一不可：主进程不开窗，事件进不来；这里不开 pointer-events，事件进来了也不落到滚动条上。
+     收起时保持 none ⇒ 收起态行为一个字节不变。 */
+  body.panel-open #panel{opacity:var(--panel-opacity,1);visibility:visible;pointer-events:auto;transition:opacity 120ms linear,visibility 0s linear 0s}
+  #plate{position:absolute;left:0;top:var(--panel-top,185px);width:var(--panel-w,440px);height:var(--panel-h,340px);
+    overflow:hidden;border-radius:5px;border:1px solid #4a7fa8;
+    background:linear-gradient(168deg,
+      rgba(var(--p0),calc(var(--panel-alpha,0.78) + 0.02)) 0%,
+      rgba(var(--p1),var(--panel-alpha,0.78)) 38%,
+      rgba(var(--p2),var(--panel-alpha,0.78)) 66%,
+      rgba(var(--p3),calc(var(--panel-alpha,0.78) + 0.01)) 100%);
+    box-shadow:0 20px 46px rgba(3,8,16,.62), inset 0 1px 0 rgba(190,220,245,.13)}
+  #plate .pg{position:absolute;left:0;top:0}
+  #plate .sheen{position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(118deg,rgba(190,220,245,.075) 0%,rgba(190,220,245,.02) 34%,rgba(190,220,245,0) 55%)}
+  #plate .scan{position:absolute;left:0;right:0;top:38%;height:34px;pointer-events:none;
+    background:linear-gradient(90deg,rgba(190,220,245,0),rgba(190,220,245,.055) 45%,rgba(190,220,245,.02) 62%,rgba(190,220,245,0))}
+  #pIn{position:relative;padding:13px 26px 12px}
+  .ph{height:13px;line-height:13px}
+  .kick{font:400 8.5px/1 ui-monospace,Consolas,monospace;letter-spacing:1.5px;color:var(--ink)}
+  .he{float:right;font:400 9px/1 ui-monospace,Consolas,monospace;color:var(--ink4)}
+  .live i{display:inline-block;width:3.4px;height:3.4px;border-radius:50%;background:#56d9c8;margin-right:2.4px;opacity:.4}
+  .live i:nth-child(2){opacity:.7}.live i:nth-child(3){opacity:1}
+  .sec{border-left:2px solid;padding-left:9px;margin:7px 0 0}
+  .sh{height:13px;line-height:13px}
+  .sl{font:400 8.5px/1 ui-monospace,Consolas,monospace;letter-spacing:1.3px}
+  .sr{float:right;font:400 8.5px/1 ui-monospace,Consolas,monospace;color:var(--ink)}
+  .t1{font-size:12.5px;color:var(--ink2);font-weight:700}
+  .tl{font:400 10px/15px system-ui,"Microsoft YaHei",sans-serif;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tl.d{color:var(--ink)}
+  .tstrip{height:12px;line-height:12px}
+  .tstrip svg{vertical-align:-1px}
+  .slab{font:400 8px/1 ui-monospace,Consolas,monospace;color:var(--ink);margin-left:8px}
+  .costrow{position:relative;height:34px;line-height:34px}
+  .cur{font-size:14px;vertical-align:6px;margin-right:3px}
+  .cnum{font:400 27px/1 ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums;letter-spacing:.4px}
+  .cdelta{font:400 9.5px/1 ui-monospace,Consolas,monospace;color:#ffc266;margin-left:9px}
+  .costrow svg{position:absolute;right:0;top:6px}
+  .tkrow{height:12px;line-height:12px}
+  .mrow{height:52px;line-height:52px;margin-top:6px}
+  .cw{display:inline-block;vertical-align:middle;margin-right:12px}
+  .cwlab{font:400 8.5px/12px ui-monospace,Consolas,monospace;color:var(--ink);font-weight:400;vertical-align:middle}
+  .mgrid{display:inline-grid;vertical-align:middle;gap:2px 12px;width:auto}
+  .mt{display:block;white-space:nowrap;line-height:13px}
+  .mt.l{display:inline-block;vertical-align:middle;margin-left:12px}
+  .ml{font:400 8px/1 ui-monospace,Consolas,monospace;color:var(--ink);margin-right:4px}
+  .mv{font:400 10.5px/1 ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
+  .mu{font:400 8px/1 ui-monospace,Consolas,monospace;color:var(--ink);margin-left:2px;font-style:normal}
+  .mt svg{vertical-align:-1px;margin-left:5px}
+  .tgrid{display:grid;gap:0 16px}
+  .tr{position:relative;height:14px;line-height:14px;font-size:9.5px;white-space:nowrap;overflow:hidden}
+  .tr svg{position:absolute;right:0;top:5px}
+  .ix{display:inline-block;width:19px;font:400 8.5px/1 ui-monospace,Consolas,monospace;color:var(--ink)}
+  .mk{display:inline-block;width:14px;font-size:9px;color:var(--ink)}
+  .tt{color:var(--ink)}
+  .tr.done .tt{color:var(--ink)}.tr.done .mk{color:#b79cff}.tr.doing .tt{color:var(--ink3)}.tr.doing .mk{color:#ffc266}
+  #leads{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+  .leL{font:400 8.5px/1 ui-monospace,Consolas,monospace;letter-spacing:.9px}
+  .leV{font:400 12px/1 ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
+  .leU{font-size:8.5px;opacity:.75}
+  body.shot:not(.panel-open) #panel{display:none}   /* 截图模式默认不画面板（黄金样本/旋转取证）；--shot-panel 验收时才画 */
+
+  /* ===== 动效全部由 JS 逐帧驱动（SPEC 第 8 节第 4 款）=====
+     这里刻意**不留任何无限 CSS 动画**：CSS 无限动画会让合成器按显示器刷新率（本机 120Hz）持续跑，
+     是空闲 CPU 降不下来的主因。旋转 / 呼吸 / 抖动 / 一次性动效都在下面的 JS 驱动里按状态帧率预算跑。
+     只保留两处**有限时长**的过渡（300ms 交叉淡入、150ms 粒子揭示），它们一次性结束，不是稳态开销。 */
+  /* 旋转层单独成合成层：旋转/半径波动只动合成器，不触发整棵 SVG 重绘（静态层不再每帧跟着重画）。
+     2026-09-19：粒子从"一整个 .cloud"改成 .cloud 里的 4 条 .lane —— 每道一个合成层（共 4 层，
+     省电档下 0 层），仍然只有 transform，没有逐帧几何重算。
+     ⚠️ `will-change` 只给**当前可见的那一层**的 .lane（`.layer.on`）：7 个状态层 × 4 车道 = 28 个
+     提升层会实打实抬高空闲 CPU（实测 IDLE +4.2 个百分点，只留 4 个之后回到基线量级）。 */
+  .cloud,.lane{transform-origin:50% 50%;transform-box:view-box}
+  .layer.on > .cloud,.layer.on .lane{will-change:transform}
+  .seg{will-change:transform;transform-origin:50% 50%;transform-box:view-box}
+  body[data-freeze="1"] .cloud,body[data-freeze="1"] .lane,body[data-freeze="1"] .seg,
+  body[data-freeze="1"] .layer.on > .cloud,body[data-freeze="1"] .layer.on .lane{will-change:auto}
+  /* 核心（L7）与静态层不参与旋转：显式钉住，防止以后被误加 */
+  .core{transform:none}
+  .layer{opacity:0;visibility:hidden;transition:opacity 300ms linear,visibility 0s linear 300ms}
+  .layer.on{opacity:1;visibility:visible;transition:opacity 300ms linear,visibility 0s linear 0s}
+  @keyframes pgIn{from{opacity:0}}
+  #flash{opacity:0}
+  .glowA{filter:url(#soft2)}
+  .glowB{display:none}
+  .layer.st-WAITING .glowA{filter:url(#soft2b)}
+  .layer.st-WAITING .glowB{display:inline;filter:url(#soft4b)}
+
+  /* ===== 冻结模式（黄金样本像素比对）：一次性动画停在 0% 关键帧，相位与 t=0 同 ===== */
+  body[data-freeze="1"] *,body[data-freeze="1"] *::before,body[data-freeze="1"] *::after{
+    animation-play-state:paused !important;transition:none !important}
+  /* 旋转在 t=0 是恒等变换，但"带变换"与"不带变换"的光栅化会差一点点 —— 冻结时干脆不挂变换 */
+</style>
+
+<style id="v2css">
+/* ===== v2：C-130J HUD 手法（单色 + 描边 + 刻度带），文字不发光 ===== */
+#v2hover{position:absolute;left:0;top:0;z-index:40;   /* 必须在环/粒子之上：文字不许被弧或粒子穿过 */
+  width:190px;padding:5px 7px;display:none;
+  pointer-events:none;font-family:ui-monospace,Consolas,monospace;
+  border-radius:calc(var(--hover-plate-a,0) * 5.3192px)}   /* 0.94 档 → 5.00px（= 改动前那一版的圆角） */
+/* ===== 悬浮信息板的「底」—— 2026-09-19 用户拍板「把这个图2的黑框全删了」 =====
+   改动前（原文，两行）：
+     #v2hover.plate{background:rgba(11,22,36,.94);border:1px solid rgba(74,127,168,.85)}
+     #v2hover 里还有 border-radius:5px
+   现在：**底 α / 边框宽 / 边框色 α / 圆角** 四条全部由**同一个可调量** `--hover-plate-a` 派生。
+      · `--hover-plate-a` = 0（**默认**）⇒ 底 α=0、边框宽=0、圆角=0 —— 一点底都不留，内容直接浮在桌面上；
+      · 调到 0.94 ⇒ 逐条还原成改动前那一版（底 rgba(11,22,36,.94)、1px 边框 α≈.85、5px 圆角）。
+   为什么做成"可调量=0"而不是把代码删掉：右键菜单「配色设置…」打开的设置窗口要能**实时**把它调回去，
+   所以这几条必须留在一个可被 IPC 改写的变量上（默认值就是"全删"）。
+   注：用户提到的「四段渐变 / 22px 网格 / 斜高光」**不在这一块上** —— 那三样是**下方展开的大面板**
+   `#plate` / `#plateBg` / `.sheen` / `.scan` 的底；本块（#v2hover）只有"单色底 + 1px 框 + 圆角"。
+   大面板的底本轮**一字未动**（用户明确要求别动它），它自己的深浅仍由 `--panel-alpha` 控制。 */
+#v2hover.plate{
+  background:rgba(11,22,36,var(--hover-plate-a,0));
+  border:calc(var(--hover-plate-a,0) * 1.064px) solid rgba(74,127,168,calc(var(--hover-plate-a,0) * .904))}
+#v2hover.noplate{background:transparent;border:0}
+#v2hover .r1{height:15px;line-height:15px;white-space:nowrap}
+/* ===== 对比度定案（2026-09-13）：
+   用户真实壁纸是**浅色**（天空+水面，实测 RGB 均值 ≈ rgb(119,157,165)），
+   半透明黑板（α .78）叠上去之后的**有效背景**是 rgb(≈40,≈58,≈74) —— 属于"中低明度"，
+   而原先的 #92aac0 / #9db6cc / #8fa8bd / #a8bdd2 这一族冷灰（明度 0.30~0.50）在这种底上
+   只有 4.1~5.7:1，8~9px 小字下**糊成一片**（用户原话：下面的都看不清）。
+   纪律：① 正文/数值一律提到白或近白；② 5 个分区色的**图形档一个字节都不动**（青#56d9c8 金#ffc266
+   淡蓝#6fb6ff 紫#b79cff 冷灰#9fb0c4）—— 用户口径「区分色可以保留」，圆点/刻度/竖条/描边/分区色边框
+   全部保持原值；只有**当文字色用**的两档按用户拍板提亮（青(动作)文字 #56d9c8→#7fe3c8、
+   淡蓝(度量数值)文字 #6fb6ff→#9ad4ff，**色相不变只提亮度**，见 PC 下方的 PTEXT）；
+   ③ 「不适用/空」不再靠"暗到看不清"表达，改用 —— 与更亮的灰蓝。
+   ✅ 已解决（2026-09-13 第二轮，用户拍板"提亮到达标"）：原先青(动作) 4.41:1、淡蓝(度量) 3.56:1
+      低于小字 4.5:1 门槛；提亮后由 PTEXT 文字档解决（青→#7fe3c8、淡蓝→#9ad4ff），
+      金/紫/冷灰原值即达标。**图形档保持原值** ⇒ 圆点/刻度/竖条/描边/.sec 边框颜色真的没变。
+      tests/v2.mjs ⑨ 已把分区色纳入硬断言，并做过"改回旧值 ⇒ 必红"的反证。
+   用户原话：「写出来了，但是这个字的颜色对比度太低了，你可以把字改成白的」「区分色可以保留」。
+   ★ 整族横扫：凡是承载文字的颜色都在这里定档，不留下"漏了某一条"的同类项。 */
+#v2panel .sh,#v2panel .mt,#v2panel .v2sec,#v2panel .na,#v2hover .st{font-size:12.5px;font-weight:700;color:var(--ink5)}
+/* ===== 代理指标行（2026-09-19：第一版在悬浮层，用户第二轮拍板**搬到 #lab 下方**）=====
+   第一版原话：「刻度尺保留轮数和工具数，只保留文字，像这个图片一样加在这行文字下面」
+   ⇒ ① 那一行**刻度尺图形整个删掉**（连同 `.v2ruler` 的 CSS 与生成 `<i>` 刻度的循环）；
+      ② 「轮数 / 工具数」只留**文字**。
+   第二轮原话：「**换到图标下面那行青色文字的下面**」⇒ 形态从"悬浮层活动行下面"改为
+   "`#lab`（图标下的青色状态行）正下方"，**样式改为沿用 `#lab`**（见上方 `#lab,#lab2` 那个块），
+   **并且从悬浮层里搬走**（`.tok2` 连同它的规则一起删除，不是复制）。
+   原则不变：代理指标（轮/步/工具数/耗时）**无分母 ⇒ 不许画成条/百分比**；
+   有分母的**计划进度**仍由 `.v2bullet` 表达 —— ⚠️ **2026-09-21 任务 C 起默认不画那根条**
+   （用户原话「我这个左上角的任务条也不要了，有环形的这样是多此一举」），
+   但这条"无分母不许画条"的纪律照旧成立（`hoverBar='on'` 时那根条会原样回来）。 */
+/* ===== 「全删底」时的文字补偿（描边 + 阴影），2026-09-19 =====
+   底没了，那层深底原先扛着的对比度也就没了（实测：深底 α.94 时文字对底 4.5:1 以上）。
+   所以文字必须**自己造出边界**：`-webkit-text-stroke` + `paint-order:stroke fill` 给每个字形描一圈深边，
+   再叠两层深阴影兜住"字缝里的亮壁纸"。
+   命中条件有两条，都指向"文字底下没有板"：
+     · `#v2hover.noplate` —— window.hoverPlate=off（老开关，保留）；
+     · `#v2hover.hp-nobg` —— **本轮新增**：由渲染层按 `--hover-plate-a` 判定（≤0.35 视为没有底），
+       即"同一个可调量"既管底、也管补偿 —— 调大底色时补偿自动退掉，不会出现"有底又描边"的双重痕迹。
+   描边参数（2.2px→3px、阴影 3px→4px）是**实测调出来的**，口径与数字见 tests/hover-plate.mjs
+   （像素口径：把窗口像素按实测 α 合成到用户真实浅色壁纸上再算 WCAG）。 */
+#v2hover.noplate .st,#v2hover.noplate .h3,#v2hover.noplate .bl,
+#v2hover.hp-nobg .st,#v2hover.hp-nobg .h3,#v2hover.hp-nobg .bl{
+  -webkit-text-stroke:3px rgba(3,8,16,.96);paint-order:stroke fill;
+  text-shadow:0 0 4px rgba(2,6,12,.98),0 1px 2px rgba(2,6,12,1),0 -1px 2px rgba(2,6,12,1)}
+#v2panel .v2sec{margin-top:6px}
+/* 空状态：居中块，底边留足行距，避免下半部整块空白 */
+#plateInner .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;height:calc(var(--panel-h,340px) - 46px);min-height:150px}
+#plateInner .ebig{font-size:13px;color:var(--ink3);letter-spacing:.5px}
+#plateInner .esub{font-size:10.5px;color:var(--ink)}
+#plateInner .esub2{font-size:10px;color:var(--ink);margin-top:2px}
+#plateInner .eline{width:150px;height:1px;background:rgba(157,196,230,.22);margin:5px 0}
+/* 顶部小字提亮到 AA（原 #92aac0 在小字号下不足）；本轮再提一档：8~9px 小字一律近白 */
+#plateInner .ph2,#plateInner .kick{color:var(--ink)}
+#plateInner .he{color:var(--ink4)}
+#plateInner .sh{color:var(--ink2)}
+#plateInner .sec{margin-bottom:9px}
+#plateInner .sec .sh{margin-bottom:5px}   /* 段标题与正文留出行距（原 3px 会相交） */
+#v2panel .sh{font:400 9px/1.25 ui-monospace,Consolas,"Microsoft YaHei",sans-serif;color:var(--ink3);letter-spacing:.6px;margin-bottom:3px}
+#v2panel .mt{font-size:10.5px;line-height:15px;color:var(--ink2);white-space:nowrap;overflow:hidden}   /* 窄行里不换行顶到下一段 */
+#v2panel .mt.na{color:var(--ink4)}
+#v2panel .trow2{height:15px;line-height:15px;font-size:10px;color:var(--ink);white-space:nowrap;overflow:hidden}
+#v2panel .trow2.d1{padding-left:10px}
+#v2panel .trow2.d2{padding-left:20px}
+#v2panel .trow2 .tw{color:var(--ink3);font-family:ui-monospace,Consolas,monospace}
+#v2panel .trow2 .mk{margin-right:5px}
+#v2panel .trow2 .mk.done{color:#7fe3c8}
+#v2panel .trow2 .mk.run{color:#56d9c8}
+#v2panel .trow2 .mk.wait{color:var(--ink)}
+#v2panel .fold{height:14px;line-height:14px;font:400 8.5px/14px ui-monospace,Consolas,monospace;color:var(--ink)}
+#v2panel .tx{font-size:10px;line-height:15px;color:var(--ink);white-space:nowrap;overflow:hidden}
+#v2panel .tx.dim2{color:var(--ink2)}
+/* 子弹图：区间底 + 实际值 + 上限竖线 */
+.v2bullet{position:relative;display:block;height:13px}
+.v2bullet .bq{position:absolute;left:0;top:3px;height:6px;background:rgba(232,244,252,.2);border-radius:1px}
+.v2bullet .bs{position:absolute;top:3px;left:0;height:6px;background:#56d9c8;border-radius:1px;
+  transform-origin:0 50%;transition:transform .28s linear}
+.v2bullet .bt{position:absolute;top:0;width:1px;height:12px;background:#ffc266}
+.v2bullet .bl{position:absolute;right:0;top:0;font-size:8.5px;line-height:13px;color:var(--ink3);white-space:nowrap}
+/* 完成相位：收束 → 爆散 → 回归。**只用 transition，一次性由 JS 切换类**（无常驻 @keyframes）。 */
+/* 完成相位由循环内 burstT 驱动（不用 CSS 类：逐帧循环会重写 transform/opacity） */
+.progRing{transition:stroke-dasharray .18s linear}
+#v2hover .h3{display:block;min-height:12px;line-height:13px;font-size:9.5px;color:#bcd0dd;white-space:normal;overflow:hidden}
+.na{color:var(--ink)}
+.warnv2{color:#ffc266}
+/* ===== 面板 v2 ===== */
+/* ★★ 2026-09-13 第三轮根因（用户报「红笔那一块全是灰的根本看不清」）：
+   病灶不在颜色，在**层叠**。#v2panel（下方第 250 行）与 #panel（第 251 行）都是
+   position:absolute 且 z-index:auto ⇒ 按 DOM 顺序绘制 ⇒ **后出现的 #panel/#plate 画在
+   #v2panel 之上**，黑板那层 rgba(…,.78) 的深蓝渐变就整个盖在 v2 段的文字上，
+   把每个字形压到名义色的 ~22%（#dbe6f2 → 实测 rgb(64,77,93)）。
+   实测（浅色壁纸，880×1050 device，dpr=2）：
+     · 上半截（#plateInner 内，**在黑板之上**）笔画像素 = 名义色本身 → 8.2~13.6:1 ✓
+     · 下半截（#v2panel 内，**被黑板盖住**）      → 1.18~2.13:1 ✗（用户看到的"灰"）
+   旧口径只量 getComputedStyle().color（两边都合格）⇒ 看不到这一层，这就是漏网之鱼。
+   修法：#v2panel 抬到黑板之上（#v2hover 用 40，这里取 30，仍低于悬浮层）。
+   #v2panel 自身**没有 background**（L1540 的口径注释），所以抬起来只抬文字，不挡环/引线。 */
+#v2panel{display:none;color:var(--ink);position:absolute;z-index:30;left:0;top:calc(var(--panel-top,185px) + 66px);width:var(--panel-w,440px);box-sizing:border-box;padding:0 16px;max-height:calc(var(--panel-h,340px) - 78px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;
+  /* 底部渐隐：滚动边界处的半行不再是"被切断"，而是"还有内容"的有意视觉语言 */
+  padding-bottom:16px;
+  -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 16px),transparent 100%);
+  mask-image:linear-gradient(to bottom,#000 calc(100% - 16px),transparent 100%)}   /* 内容上界跟随黑板高度；超出走内部滚动，绝不溢到黑板外 */
+#v2panel .ph2{height:13px;line-height:13px;font:400 8.5px/1 ui-monospace,Consolas,monospace;color:var(--ink);letter-spacing:1.4px}
+#v2panel .ph2 .he{float:right;letter-spacing:0}
+#v2panel .sess{margin-top:5px}
+#v2panel .srow{height:15px;line-height:15px;font-size:10.5px;color:var(--ink4);white-space:nowrap;overflow:hidden}
+#v2panel .srow .agg{float:right;font:400 9px/15px ui-monospace,Consolas,monospace;color:var(--ink3)}
+#v2panel .plan{font:400 8.5px/12px ui-monospace,Consolas,monospace;color:#ffc266;height:12px;white-space:nowrap;overflow:hidden}
+/* 子代理树：缩进 + 连接线 + 状态图标 */
+#v2panel .tree2{margin-top:6px}
+#v2panel .trow{position:relative;height:19px;line-height:19px;font-size:10.5px;white-space:nowrap;overflow:hidden;
+  transition:opacity .12s linear}
+#v2panel .trow.root{color:var(--ink5);font-weight:600}
+#v2panel .trow .tw{color:var(--ink3);font-family:ui-monospace,Consolas,monospace}
+#v2panel .trow .ar{display:inline-block;width:10px;color:var(--ink);font-size:9px}
+#v2panel .trow .tail{float:right;font:400 8.5px/19px ui-monospace,Consolas,monospace;color:var(--ink);margin-left:8px}
+#v2panel .trow .ic{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:7px;vertical-align:0}
+#v2panel .trow .ic.run{background:#56d9c8}
+#v2panel .trow .ic.done{background:#7fe3c8}
+#v2panel .trow .ic.failed{background:#ff8f7a}
+#v2panel .trow .ic.stopped,#v2panel .trow .ic.unknown,#v2panel .trow .ic.wait{background:none;border:1.3px solid #a8bdd2}
+#v2panel .trow.hot{background:rgba(86,217,200,.10);border-radius:3px}
+#v2panel .trow.hot::before{content:'';position:absolute;left:-6px;top:2px;bottom:2px;width:2px;background:#56d9c8;border-radius:1px}
+#v2panel .fold{height:15px;line-height:15px;font:400 8.5px/15px ui-monospace,Consolas,monospace;color:var(--ink)}
+#v2panel .foot{margin-top:6px;padding-top:5px;border-top:1px solid rgba(157,196,230,.16);
+  font:400 8.5px/1.5 ui-monospace,Consolas,monospace;color:var(--ink);white-space:normal}
+/* ===== 三档剖面：只动 transform / opacity / background-position ===== */
+.tier-eco .anim{animation:none !important}
+.tier-standard .anim{animation-duration:6s}
+.tier-smooth .anim{animation-duration:2.4s}
+@keyframes v2spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes v2breath{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes v2scan{from{background-position:0 0}to{background-position:22px 0}}
+.v2spin{animation:v2spin 4s linear infinite;transform-origin:50% 50%}
+.v2breath{animation:v2breath 2.4s ease-in-out infinite}
+.v2scan{background-image:repeating-linear-gradient(90deg,rgba(232,244,252,.55) 0 6px,rgba(232,244,252,0) 6px 9px);
+  animation:v2scan 2.2s linear infinite}
+</style>
+</head>
+<body>
+<div id="v2hover" class="plate"></div>
+<div id="v2panel"></div>
+<div id="panel"><svg id="leads" viewBox="0 0 440 525" width="100%" height="100%"></svg>
+  <div id="plate"><svg class="pg" id="plateBg" width="440" height="340" viewBox="0 0 440 340"></svg>
+    <div class="sheen"></div><div class="scan"></div><div id="pIn"><div id="plateInner"></div></div></div></div>
+<div id="stage">
+  <div id="zoom">
+    <div id="shk">
+      <svg id="ico" class="st-IDLE" viewBox="0 0 200 200" width="144" height="144"
+           preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- L1 底盘渐变（固定色，不随状态变；SPEC 第 2 节） -->
+          <radialGradient id="plateGrad">
+            <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+            <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="flashGrad">
+            <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+            <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+          </radialGradient>
+          <!-- L6 核心辉光的高斯模糊（SPEC 第 2 节：模糊 11）；两个呼吸档来自黄金样本实体尺寸 6px/20px -->
+          <filter id="soft2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="11"/></filter>
+          <filter id="soft2b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3"/></filter>
+          <filter id="soft4b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="10"/></filter>
+          <!-- 视觉基准：temp4/hybrid.html 的 <symbol id="base-h2">，几何一字未改 -->
+          <g id="base-h2">
+            <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad)"/>
+            <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)"
+                    stroke-width="1" stroke-dasharray="1.5 7"/>
+            <!-- 进度环（v2）：r=88 夹在 tick 环(94) 与分段弧(60) 之间；无计划时整条不画 -->
+            <circle class="progRing" cx="100" cy="100" r="88" fill="none" stroke="#56d9c8" stroke-width="3.5"
+                    stroke-linecap="round" transform="rotate(-90 100 100)"
+                    stroke-dasharray="0 552.9" opacity="0" style="transition:stroke-dasharray .35s linear,opacity .3s linear"/>
+            <g class="cloud"></g>
+            <g class="seg">
+              <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+                      stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+            </g>
+            <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+            <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)" opacity="calc(var(--core) * .2)"/>
+            <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+            <!-- SUCCESS 的扩散环：按黄金样本的叠放次序，夹在辉光与核心之间 -->
+            <circle class="burst" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+            <g class="core">
+              <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+                    stroke-linejoin="round" opacity="var(--core)"/>
+              <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="var(--core)"/>
+            </g>
+          </g>
+        </defs>
+        <g id="layers"></g>
+        <g id="fx">
+          <circle id="flash" cx="100" cy="100" r="62" fill="url(#flashGrad)"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+  <div id="lab"></div>
+  <!-- 代理指标行（轮数 · 工具数）：2026-09-19 用户拍板从悬浮层**搬到这里** —— #lab 的正下方，
+       样式沿用 #lab（同一个 CSS 块）。可见性也沿用 #lab（hot 才显示、面板开着时隐藏）。 -->
+  <div id="lab2"></div>
+</div>
+<script>
+'use strict'
+/* ==========================================================================
+   H2「等离云核」渲染器
+   视觉资产来源：temp4/hybrid.html 的 <symbol id="base-h2"> / halo() / .st-* 变量
+   常量来源    ：docs/SPEC-H2.md 第 2/3/4 节 + golden/h2-golden.html（黄金样本同源实现）
+   ========================================================================== */
+var NS = 'http://www.w3.org/2000/svg'
+/* 没有 preload 桥时（例如用普通浏览器打开本页面做像素比对）退化成空实现，绝不因为桥缺失而整页白屏。
+   注意：Electron 里 contextBridge 暴露的 window.dsh 是只读属性，不能回写，否则渲染层直接抛错白屏。 */
+var BRIDGE = window.dsh
+if (!BRIDGE) {
+  BRIDGE = {
+    onMessage: function () {}, dragBy: function () {}, dragEnd: function () {}, activate: function () {},
+    menu: function () {}, painted: function () {}, fps: function () {}, log: function () {},
+    treeRows: function () {}, panelHitRect: function () {}
+  }
+}
+var Q = new URLSearchParams(location.search)
+var STATES = ['IDLE','THINKING','WORKING','WAITING','SUCCESS','ERROR','DISCONNECTED']
+/* 黄金样本沿用 SPEC 的短名（粒子种子依赖它，必须一致） */
+var GKEY = { IDLE:'IDLE', THINKING:'THINK', WORKING:'WORK', WAITING:'WAIT',
+             SUCCESS:'OK', ERROR:'ERR', DISCONNECTED:'OFF' }
+/* SPEC 第 3 节：粒子数 / 半径带 */
+var PT = { IDLE:{n:36,R:[80,96]}, THINK:{n:62,R:[76,94]}, WORK:{n:98,R:[72,92]}, WAIT:{n:52,R:[80,97]},
+           OK:{n:98,R:[72,92]}, ERR:{n:98,R:[72,92]}, OFF:{n:36,R:[80,96]} }
+var LAB = { IDLE:'空闲', THINKING:'思考中', WORKING:'执行中', WAITING:'待确认',
+            SUCCESS:'完成', ERROR:'出错', DISCONNECTED:'离线' }
+var ACT = { searching:'搜索', editing:'编辑', testing:'测试', commanding:'命令' }
+
+/* ---------- 确定性伪随机 + halo()：与 hybrid.html / 黄金样本同源 ---------- */
+function makeRnd (seed) { var s = seed >>> 0 || 1; return function () { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff } }
+function halo (rnd, R) {
+  var u = rnd() * 2 - 1, th = rnd() * Math.PI * 2, s = Math.sqrt(1 - u * u)
+  var rad = R[0] + rnd() * (R[1] - R[0])
+  return { x: 100 + rad * s * Math.cos(th), y: 100 + rad * u * 0.94, z: (Math.sin(th) * s + 1) / 2 }
+}
+
+var stage = document.getElementById('stage')
+var ico = document.getElementById('ico')
+var lab = document.getElementById('lab')
+var lab2 = document.getElementById('lab2')
+var layersRoot = document.getElementById('layers')
+var base = document.getElementById('base-h2')
+
+/* 被渲染的进度环：base-h2 是 <defs> 里的模板 —— defs 内容**永不绘制**，且七个状态层
+   各 cloneNode(true) 复制 base.children 时会把 id 一起复制。 ⇒ 文档里共有 8 个
+   同名 id 的圆（1 个 defs 母本 + 7 个可见克隆），getElementById 只能取到文档序
+   第一个 = 母本 ⇒ 写它**没有任何视觉效果**，7 个可见克隆恒停在标记里的
+   stroke-dasharray="0 552.9" opacity="0" ⇒ 环恒不可见。
+   所以环必须按 class 选择，并**遍历全部 7 个克隆**逐个写。 */
+function progRings () { return ico.querySelectorAll('.layer .progRing') }
+
+/* ---------- 建立七层：每层一份完整 7 层几何，独立配色，交叉淡入 ---------- */
+/* 粒子运动多样性（2026-09-19 用户要求「主体是旋转，但可以速度不一，方向不一，还可以半径小幅波动」）：
+   把粒子按「深度排序后的序号 % LANE_N」分进 4 条**独立车道**（`.cloud > .lane`），每条车道一个
+   transform（`rotate(基础角×速度因子) scale(1±半径波动)`）。四个要点：
+   ① 速度不一/方向不一：速度因子互不相同且**有负数** ⇒ 同一个相位下各车道转过的角度不同、有反向的；
+      `% ` 分组而不是按半径分段 ⇒ 相邻深浅的粒子速度不同，观感是"个体差异"而不是"整片一起转"。
+   ② 半径小幅波动：只动 `scale()`（以视框中心为原点）⇒ 粒子沿半径小幅呼吸；
+      幅度 ≤2%（r≤97 处径向位移 ≤1.9px），周期互不相同 ⇒ 不会同拍。
+   ③ **核心三角恒定不变形**：车道只包住 `.cloud` 里的粒子，L7 核心根本不在这条链上 ⇒ 逐像素不受影响
+      （tests/particle-motion.mjs 的 P4 跨相位量核心区最大通道差）。
+   ④ **省电档（eco / --fps saver）per-lane 运动完全不生效**（`motionOn()` 为假）⇒ 退回改动前的整片
+      刚性旋转，省电档一个像素都不比改动前更"活"（P4/E1/E2 断言）。
+   代价：只增加 4 个合成层（原先 `.cloud` 自己一层），不产生逐帧几何重算 —— 与 SPEC 第 8 节的性能纪律一致。 */
+var LANE_N = 4
+/* 车道表：`s` = 相对基础角速度的倍数（负 = 反向）；`ox/oy` = 该车道**旋转轴心相对视框中心的偏移**
+   （视框单位，200×200）。轴心偏一点 ⇒ 该车道在旋转的同时绕中心做一个小圆平移
+   ⇒ **每个粒子的半径随相位在 ±|(ox,oy)| 内起伏** = 用户要的"半径小幅波动"，
+   而旋转本身在合成层里是**不重采样**的（实测代价 ≈ 0），不像 `scale()` 那样每帧重采样
+   （4 条车道各带 scale 时 WORKING 单核占用实测从 ~13% 涨到 ~24%）。 */
+var LANE_MOTION = [
+  { s: 1.50, ox: 1.6, oy: 0.0 },     /* 快车道：1.50 倍基础角速度，轴心偏 +x */
+  { s: 1.20, ox: 0.0, oy: 1.2 },
+  { s: 0.90, ox: -1.6, oy: 0.0 },
+  { s: -0.60, ox: 0.0, oy: -1.0 }    /* **反向**车道：角速度为负，轴心偏 -y */
+]
+var LANE_WOB_U = LANE_MOTION.map(function (m) { return Math.sqrt(m.ox * m.ox + m.oy * m.oy) })   /* 各车道的半径起伏幅度（视框单位） */
+var WOB_U_MAX = Math.max.apply(null, LANE_WOB_U)
+/* 冻结通道：相位 0° 时**必须是恒等变换**（黄金样本逐像素比对吃这条）。
+   车道角位移 = 基础相位 × 速度因子 ⇒ spin=0 时全为 0 ⇒ 不挂 transform ✓；
+   半径波动由"轴心偏移"表达（静态的 transform-origin），在 spin=0 时同样不产生任何位移 ✓。 */
+/* per-lane 运动开关。**冻结抓图走同一条判据**（不做特例）："取证通道量到的就是线上跑的"，
+   否则会造出"冻结图里在动、实际线上不动"的假象（省电档就是这么被量错的）。
+   ⚠️ `V2PROFILE` 在**第二个 script 块**里声明，而本函数会被第一个块在 init 时调用
+   （applyState → restartAnim → step → setRot）⇒ 必须用 `typeof` 守卫，
+   否则会抛 Uncaught ReferenceError 让首帧与驱动整条链断掉（实测被 clear-error 那条套件抓到）。 */
+function motionOn () {
+  if (typeof V2PROFILE !== 'undefined' && V2PROFILE === 'eco') return false   /* 资源剖面"省电" */
+  if (FPS_BUDGET && FPS_BUDGET.power === 'saver') return false                /* 菜单"流畅度=省电" */
+  return true
+}
+var LAYER = {}, PARTICLES = {}, LANES = {}
+STATES.forEach(function (st) {
+  var g = document.createElementNS(NS, 'g')
+  g.setAttribute('class', 'layer st-' + st)
+  for (var i = 0; i < base.children.length; i++) g.appendChild(base.children[i].cloneNode(true))
+  var cloud = g.querySelector('.cloud')
+  var lanes = []
+  for (var L = 0; L < LANE_N; L++) {
+    var lg = document.createElementNS(NS, 'g')
+    lg.setAttribute('class', 'lane lane' + L)
+    /* 轴心 = 视框中心 + 该车道的偏移（transform-box:view-box ⇒ 这里的 px 就是视框单位）。
+       旋转轴心偏一点 ⇒ 该车道边转边绕中心做小圆平移 ⇒ 粒子半径小幅起伏。轴心仍只由
+       transform-origin 表达（transform 值里不带轴心参数，避免双重轴心 —— 见 setRot 的注释）。 */
+    var mo = LANE_MOTION[L % LANE_MOTION.length]
+    lg.style.transformOrigin = (100 + mo.ox) + 'px ' + (100 + mo.oy) + 'px'
+    cloud.appendChild(lg)
+    lanes.push(lg)
+  }
+  var pt = PT[GKEY[st]]
+  var rnd = makeRnd(90210 + 777 + GKEY[st].charCodeAt(0) * 131)
+  var ps = []
+  for (var k = 0; k < pt.n; k++) ps.push(halo(rnd, pt.R))
+  ps.sort(function (a, b) { return a.z - b.z })            /* 深→浅，浅色压在深色之上 */
+  var nodes = []
+  for (var j = 0; j < ps.length; j++) {
+    var c = document.createElementNS(NS, 'circle')
+    c.setAttribute('cx', ps[j].x.toFixed(1))
+    c.setAttribute('cy', ps[j].y.toFixed(1))
+    c.setAttribute('r', (0.85 + ps[j].z * 1.5).toFixed(2))
+    c.setAttribute('fill', 'var(--c1)')
+    c.setAttribute('opacity', (0.26 + 0.74 * ps[j].z).toFixed(2))
+    lanes[j % LANE_N].appendChild(c)
+    nodes.push(c)
+  }
+  layersRoot.appendChild(g)
+  LAYER[st] = g
+  LANES[st] = lanes
+  PARTICLES[st] = nodes
+})
+
+/* ---------- 状态切换 ---------- */
+var cur = null, curPayload = {}, revealTimer = null
+var FREEZE = Q.get('shot') === '1'
+var SPIN0 = Number(Q.get('spin') || 0)   /* 冻结相位(度)：供轴心正确性的客观取证 */
+/* 取证用：?hide=cloud,seg 临时隐藏指定层（只影响抓图，不影响产品路径） */
+var HIDE = (Q.get('hide') || '').split(',').filter(Boolean)
+if (FREEZE) { document.body.setAttribute('data-freeze', '1'); document.body.classList.add('shot') }
+
+function setLabel () {
+  var t = LAB[cur] || cur || ''
+  if (curPayload.activity && ACT[curPayload.activity]) t += ' · ' + ACT[curPayload.activity]
+  else if (curPayload.task) t += ' · ' + String(curPayload.task).slice(0, 18)
+  /* reasonKind：中性结束（max-tokens / interrupted）给一个**极轻**的尾标，绝不染红 ——
+     它们不是故障（用户实测那条卡红路径就是"报告太长撞上输出上限"）。 */
+  var RK = { 'max-tokens': '上限', interrupted: '中断' }
+  if (curPayload.reasonKind && RK[curPayload.reasonKind]) t += ' · ' + RK[curPayload.reasonKind]
+  /* 宿主 state 载荷里的 tokens = {input,output,total}（宿主定的结构），有就顺带显示总量 */
+  var tk = curPayload.tokens
+  if (tk && Number.isFinite(Number(tk.total))) {
+    var n = Number(tk.total)
+    t += ' · ' + (n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n)) + ' \u8bcd\u5143'
+  }
+  lab.textContent = t
+  /* 第 2 行：代理指标「轮数 · 工具数」（2026-09-19 从悬浮层搬来，样式/可见性沿用 #lab）。
+     口径不变：**只有文字**，不画条、不给百分比 —— 代理指标没有分母。
+     数据源与悬浮层那行**同一个**（v2 字段登记的 metrics：它按"最新一次收到"持久化，
+     裸 state 消息不会把它抹掉）；v2 侧还没起来时退回本次载荷的 metrics。
+     没有数据就留空 —— 宁可缺，不可假。 */
+  var mt = (typeof V2 !== 'undefined' && V2 && V2.metrics) ? V2.metrics : curPayload.metrics
+  lab2.textContent = (mt && typeof mt.turns === 'number')
+    ? (mt.turns + ' \u8f6e \u00b7 ' + (mt.toolCalls || 0) + ' \u5de5\u5177') : ''
+  try { logLabRow('label') } catch (e) { /* 留痕失败不影响渲染 */ }
+}
+
+function applyState (st, payload) {
+  if (STATES.indexOf(st) < 0) return
+  if (payload) curPayload = payload
+  var prev = cur
+  cur = st
+  ico.setAttribute('class', 'st-' + st)
+  /* #stage 也带状态类：只给状态文字取色；层级选择器一律写成 .layer.st-*，不会串到别的层 */
+  stage.setAttribute('class', stage.classList.contains('hot') ? ('hot st-' + st) : ('st-' + st))
+  setLabel()
+  var next = LAYER[st]
+  if (!next) return
+  /* 上一层的粒子逐颗揭示动画先清掉（下次进入重新揭示） */
+  if (revealTimer) { clearTimeout(revealTimer); revealTimer = null }
+  if (prev && prev !== st) {
+    var old = PARTICLES[prev]
+    for (var i = 0; i < old.length; i++) old[i].style.animation = ''
+  }
+  Object.keys(LAYER).forEach(function (k) { LAYER[k].classList.toggle('on', k === st) })
+  /* 粒子数线性插值：新层粒子按序号逐颗延迟 150ms 揭示（总数 0→n 线性增长）
+     冻结模式（黄金样本比对）下动画停在 0% 关键帧，粒子会整层不可见 —— 必须跳过 */
+  var ps = PARTICLES[st]
+  if (ps && ps.length && !FREEZE) {
+    for (var j = 0; j < ps.length; j++) {
+      ps[j].style.animation = 'pgIn 150ms linear ' + (j / ps.length * 150).toFixed(1) + 'ms 1 backwards'
+    }
+    revealTimer = setTimeout(function () {
+      revealTimer = null
+      for (var m = 0; m < ps.length; m++) ps[m].style.animation = ''
+    }, 340)
+  }
+  for (var h = 0; h < HIDE.length; h++) {
+    var hd = document.querySelectorAll('.' + HIDE[h])
+    for (var k = 0; k < hd.length; k++) hd[k].style.display = 'none'
+  }
+  BRIDGE.log('state=' + st + ' particles=' + (ps ? ps.length : 0) + ' prev=' + prev + ' hide=' + HIDE.join('|'))
+  restartAnim()
+}
+
+function setHot (hot) {
+  stage.classList.toggle('hot', !!hot)
+  BRIDGE.log('hot=' + !!hot + ' label=' + ((!!hot && !panelOpen) ? 'SHOW' : 'HIDDEN') + ' panelOpen=' + panelOpen)
+  try { logLabRow('hot') } catch (e) { /* 留痕失败不影响交互 */ }
+  /* 再补一条**过渡结束后**的留痕：两行的 opacity 有 140ms 过渡，切换瞬间 getComputedStyle
+     拿到的是过渡起点（0）；判"两行可见性一致、且 hot 时真的显示"必须看稳定态，否则是测试假红。 */
+  if (labRowTimer) clearTimeout(labRowTimer)
+  labRowTimer = setTimeout(function () { try { logLabRow('hot-settled') } catch (e) { /* ignore */ } }, 240)
+}
+var labRowTimer = null
+/* 图标下两行的形态留痕（机器可读 JSON，tests/hover-metrics-row.mjs 吃它）：
+   ① 两行的**文本**（判"取到真实值、不是空串"）；
+   ② 两行的**样式指纹**（fontFamily/fontSize/fontWeight/color/letterSpacing/lineHeight/textShadow/opacity）
+      —— 判"第 2 行与 #lab 同族"就是逐字段比这个字符串；
+   ③ 两行 + 图标(#zoom) + 悬浮层(#v2hover) + 视口的**矩形**（判"不越界、不重叠"）。
+   全是**自有数据**（字符串/数字数组），不含任何活对象。 */
+function logLabRow (tag) {
+  var fp = function (cs) {
+    return cs ? [cs.fontFamily, cs.fontSize, cs.fontWeight, cs.color, cs.letterSpacing, cs.lineHeight,
+      cs.textShadow, cs.opacity].join('|') : ''
+  }
+  var rc = function (el) {
+    if (!el) return null
+    var r = el.getBoundingClientRect()
+    return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]
+  }
+  var cs1 = lab ? window.getComputedStyle(lab) : null
+  var cs2 = lab2 ? window.getComputedStyle(lab2) : null
+  var hv = document.getElementById('v2hover')
+  BRIDGE.log('labrow(' + tag + '): ' + JSON.stringify({
+    labText: lab ? (lab.textContent || '') : null,
+    lab2Text: lab2 ? (lab2.textContent || '') : null,
+    labStyle: fp(cs1), lab2Style: fp(cs2),
+    sameStyle: fp(cs1) === fp(cs2) && !!cs1,
+    labDisplay: cs1 ? cs1.display : null, lab2Display: cs2 ? cs2.display : null,
+    lab: rc(lab), lab2: rc(lab2), zoom: rc(document.getElementById('zoom')), hover: rc(hv),
+    win: [window.innerWidth, window.innerHeight],
+    tok2InHover: hv ? hv.querySelectorAll('.tok2').length : -1
+  }))
+}
+
+/* ==========================================================================
+   动效驱动（JS 逐帧）
+   SPEC 第 8 节第 4 款要求：空闲态不要挂无限 CSS 动画，否则合成器会按显示器刷新率（本机 120Hz）
+   一直跑。这里按状态给帧率预算，状态不需要动时**直接停掉渲染循环**（ERROR / DISCONNECTED 稳态零重绘）。
+
+   帧率**可由宿主实时下发**（config 消息里的 window.fps），无需重启窗口：
+     · 预设字符串：'saver' | 'standard' | 'smooth'
+     · 或对象：{ idle, thinking, waiting, working }（缺的字段取 standard 的值）
+   三个预设（用户可在右键菜单"流畅度"里切，走 setting → 宿主 → config 回环）：
+     saver    = { idle: 4,  thinking: 15, waiting: 15, working: 30 }
+     standard = { idle: 15, thinking: 30, waiting: 30, working: 60 }   ← 默认
+     smooth   = { idle: 30, thinking: 60, waiting: 60, working: 120 }  （120 = 跟满刷新率）
+   ========================================================================== */
+var FPS_PRESETS = {
+  saver: { idle: 4, thinking: 15, waiting: 15, working: 30 },
+  standard: { idle: 15, thinking: 30, waiting: 30, working: 60 },
+  smooth: { idle: 30, thinking: 60, waiting: 60, working: 120 }
+}
+var FPS_BUDGET = { power: 'standard', idle: 15, thinking: 30, waiting: 30, working: 60 }
+var FPS = { IDLE: 15, THINKING: 30, WORKING: 60, WAITING: 30, SUCCESS: 60, ERROR: 60, DISCONNECTED: 0 }
+function applyFpsBudget (spec) {
+  var b = { power: 'custom', idle: 15, thinking: 30, waiting: 30, working: 60 }
+  if (typeof spec === 'string' && FPS_PRESETS[spec]) { b = Object.assign({}, FPS_PRESETS[spec], { power: spec }) }
+  else if (spec && typeof spec === 'object') {
+    if (typeof spec.power === 'string' && FPS_PRESETS[spec.power]) b = Object.assign({}, FPS_PRESETS[spec.power], { power: spec.power })
+    for (var k in FPS_PRESETS.standard) { if (spec[k] != null && isFinite(Number(spec[k]))) b[k] = Math.max(0, Math.min(240, Math.round(Number(spec[k])))) }
+  } else return FPS_BUDGET
+  FPS_BUDGET = b
+  FPS.IDLE = b.idle; FPS.THINKING = b.thinking; FPS.WAITING = b.waiting
+  FPS.WORKING = b.working; FPS.SUCCESS = b.working || 60; FPS.ERROR = b.working || 60
+  /* 立即生效：重排驱动（不需要重启窗口；状态不需要动时仍然完全停表） */
+  if (typeof restartAnim === 'function' && LAYER && LAYER[cur]) restartAnim()
+  if (typeof logMotion === 'function') { try { logMotion() } catch (e) { /* 留痕失败不影响驱动 */ } }
+  return FPS_BUDGET
+}
+var SPIN = { IDLE: 60, THINKING: 24, WORKING: 6, WAITING: 18, SUCCESS: 2, ERROR: 0, DISCONNECTED: 0 }  /* 秒/圈，0=冻结 */
+var ONESHOT = { SUCCESS: 1200, ERROR: 480 }                                                           /* 一次性动效时长 ms */
+var CORE = { IDLE: .13, THINKING: .42, WORKING: 1, WAITING: .55, SUCCESS: 1, ERROR: .7, DISCONNECTED: .2 }
+var SHAKE = [0, 1, 0, -1, 0, 1, 0, -1, 0]
+var A = { timer: 0, raf: 0, last: 0, dt: 16, t: 0, angle: 0 }
+var drvFrames = 0, drvWindow = 0, drvMark = 0
+
+function needsLoop () {
+  if (FREEZE) return false
+  if ((FPS[cur] || 0) > 0) return true
+  var one = ONESHOT[cur]
+  return !!one && A.t < one
+}
+/* 关键：**不要用连续的 requestAnimationFrame 链**——只要还在排 rAF，Chromium 就会按显示器刷新率
+   一直产帧（本机 120Hz），这正是空闲 CPU 压不下来的原因（实测 6fps 的 rAF 链反而比 CSS 动画更贵）。
+   改成 setTimeout 链：两次更新之间没有任何待处理帧，合成器直接空闲；状态不需要动时**完全停掉定时器**。 */
+/* 两种驱动按帧率预算自动选：
+   · <30fps（IDLE/THINKING/WAITING）→ setTimeout 链：两次更新之间没有待处理帧，合成器彻底空闲
+   · >=30fps（WORKING 与一次性动效）→ rAF 链：跟住显示器刷新率，保证"工作态 ≥55fps"这条验收 */
+function ensureLoop () {
+  if (A.timer || A.raf || !needsLoop()) return
+  A.last = performance.now()
+  if ((FPS[cur] || 60) >= 30) A.raf = requestAnimationFrame(rafTick)
+  else A.timer = setTimeout(tick, 1000 / (FPS[cur] || 60))
+}
+function stopLoop () {
+  if (A.timer) clearTimeout(A.timer)
+  if (A.raf) cancelAnimationFrame(A.raf)
+  A.timer = 0; A.raf = 0
+}
+function rafTick (now) {
+  A.raf = 0
+  var budget = 1000 / (FPS[cur] || 60)
+  var dt = now - A.last
+  /* 按状态帧率预算跳帧：显示器是 120Hz，但 WORKING 只需要 60fps ——
+     不跳帧就会以 120 次/秒重绘整个 SVG（实测让 WORKING 从 ~16% 涨到 ~34% 单核）。
+     A.last 仍按真实时间推进，所以角度/相位的时间轴不受跳帧影响。 */
+  if (dt >= budget) {
+    A.dt = Math.min(dt, 250)
+    A.t += A.dt
+    A.last = now - (dt % budget)   /* 保留余数：否则 120Hz 下会因浮点余量累积成 ~40fps */
+    tickBody()
+  }
+  if (needsLoop()) A.raf = requestAnimationFrame(rafTick)
+  else stopLoop()
+}
+function tickBody () {
+  var per = SPIN[cur] || 0
+  if (per > 0) A.angle = (A.angle + 360 * (A.dt / 1000) / per) % 360
+  step()
+  drvFrames++
+}
+function tick () {
+  A.timer = 0
+  var now = performance.now()
+  var dt = now - A.last
+  A.last = now
+  A.dt = Math.min(dt, 250)
+  A.t += A.dt
+  tickBody()
+  schedule()
+}
+function schedule () {
+  if (!needsLoop()) { stopLoop(); return }
+  A.timer = setTimeout(tick, Math.max(0, 1000 / (FPS[cur] || 60) - (performance.now() - A.last)))
+}
+function restartAnim () {
+  stopLoop()
+  /* 冻结态：A.t 由 --spin 折算（0°→0ms），这样"半径波动"也有一条**确定性**的取证通道，
+     同时保证 spin=0 时波动相位为 0 ⇒ 变换恒等 ⇒ 黄金样本仍然逐像素（单公式，无特例分支）。 */
+  A.t = FREEZE ? (SPIN0 / 360 * 6000) : 0
+  A.angle = FREEZE ? SPIN0 : 0
+  A.dt = 16
+  step()                      /* 立即出第一帧：冻结抓图与状态切换后的首帧都靠它 */
+  ensureLoop()
+}
+/* 该转的两处：L3 等离子云的 4 条车道（各按自己的速度因子/方向/半径波动）与 L4 分段环（整片刚性旋转）。
+   L7 核心（三角 + 中心圆）永不参与 —— SPEC 第 2 节："核心恒定不变形"，这是 H2 的定义性特征。
+   轴心只由 CSS 的 transform-origin 定义，transform 值里不带轴心参数：
+   否则 SVG transform 属性会被当作 CSS transform 属性，与 transform-origin 叠加成双重轴心
+   （实测 rotate(a 100 100) + transform-origin:50% 50% 的等效轴心会漂到 (200,200)，
+   表现就是"绕图标最下面转"）。`scale()` 与 `rotate()` 同一个原点 ⇒ 半径波动也是绕视框中心的。 */
+function setRot (layer, deg) {
+  var seg = layer.querySelector('.seg')
+  if (seg) seg.style.transform = deg ? ('rotate(' + deg.toFixed(2) + 'deg)') : ''
+  var lanes = layer.querySelectorAll('.cloud > .lane')
+  if (!motionOn()) {
+    /* 省电档：**退回改动前的整片刚性旋转** —— transform 挂在 .cloud 上（1 个合成层），
+       4 条车道不挂任何 transform。这样省电档的 DOM/变换与改动前逐字节等价，
+       既不更"活"也不更贵（实测 saver 档 IDLE 的 CPU 就是靠这一条回到基线量级）。 */
+    var cl = layer.querySelector('.cloud')
+    if (cl) cl.style.transform = deg ? ('rotate(' + deg.toFixed(2) + 'deg)') : ''
+    for (var j = 0; j < lanes.length; j++) lanes[j].style.transform = ''
+    return
+  }
+  var c2 = layer.querySelector('.cloud')
+  if (c2) c2.style.transform = ''      /* 有 per-lane 运动时 .cloud 不自己转（否则叠加成双倍角速度） */
+  for (var i = 0; i < lanes.length; i++) {
+    var a = deg * LANE_MOTION[i % LANE_MOTION.length].s
+    lanes[i].style.transform = a ? ('rotate(' + a.toFixed(2) + 'deg)') : ''
+  }
+}
+/* 车道运动表 → 一行机器可读留痕（tests/particle-motion.mjs 吃它）：速度范围/方向/反向占比/半径波动幅度与周期 */
+function logMotion () {
+  var pt = PT[GKEY[cur]] || { R: [0, 0] }
+  var sp = [], cnt = [], wob = []
+  for (var i = 0; i < LANE_N; i++) {
+    var m = LANE_MOTION[i % LANE_MOTION.length]
+    sp.push(m.s.toFixed(2))
+    wob.push(LANE_WOB_U[i % LANE_WOB_U.length].toFixed(2))
+    var ls = LANES[cur] ? LANES[cur][i] : null
+    cnt.push(ls ? ls.childNodes.length : 0)
+  }
+  var rev = 0, tot = 0
+  for (var k = 0; k < cnt.length; k++) { tot += cnt[k]; if (LANE_MOTION[k % LANE_MOTION.length].s < 0) rev += cnt[k] }
+  /* 该状态的基础角速度 → 每条车道的半径波动周期 = 该车道自己的旋转周期（=|SPIN|/|s| 秒） */
+  var per = LANE_MOTION.map(function (m) { return Math.round(Math.abs(SPIN[cur] || 0) / Math.abs(m.s) * 1000) })
+  BRIDGE.log('motion: on=' + (motionOn() ? '1' : '0') + ' eco=' + (((typeof V2PROFILE !== 'undefined' && V2PROFILE === 'eco') || (FPS_BUDGET && FPS_BUDGET.power === 'saver')) ? '1' : '0') +
+    ' lanes=' + LANE_N + ' speeds=' + sp.join(',') + ' dirs=' + LANE_MOTION.map(function (m) { return m.s < 0 ? -1 : 1 }).join(',') +
+    ' wobAmp=' + wob.join(',') + ' periods=' + per.join(',') + ' particles=' + cnt.join(',') +
+    ' reverseShare=' + (tot ? (rev / tot).toFixed(3) : '0') + ' wobU=' + Math.min.apply(null, LANE_WOB_U).toFixed(2) + '~' + WOB_U_MAX.toFixed(2) +
+    ' wobOn=' + (motionOn() ? 'lane-orbit' : 'off') + ' band=' + pt.R[0] + ',' + pt.R[1] + ' state=' + cur)
+}
+function setCore (layer, op) {
+  var k = layer.querySelectorAll('.core > *')
+  for (var i = 0; i < k.length; i++) k[i].setAttribute('opacity', op.toFixed(3))
+}
+function step () {
+  var st = cur, layer = LAYER[st]
+  if (!layer) return
+  var core = CORE[st], t = A.t
+  /* L3 云 + L4 分段环旋转（SPEC 第 3 节角速度） */
+  setRot(layer, A.angle)
+  /* 待确认：整图 1.9s 呼吸（辉光模糊 6px ↔ 20px 档，用两颗预算模糊的辉光交叉淡化 + 核心同相呼吸） */
+  if (st === 'WAITING') {
+    var ph = 0.5 - 0.5 * Math.cos(2 * Math.PI * t / 1900)
+    var g = core * (0.2 + 0.8 * ph)
+    layer.querySelector('.glowA').setAttribute('opacity', (ph < 0.5 ? g : 0).toFixed(3))
+    layer.querySelector('.glowB').setAttribute('opacity', (ph >= 0.5 ? g : 0).toFixed(3))
+    setCore(layer, Math.min(1, core * (0.82 + 0.18 * ph)))
+  } else if (st === 'THINKING') {
+    var ph2 = 0.5 - 0.5 * Math.cos(2 * Math.PI * t / 3000)
+    setCore(layer, Math.min(1, core * (0.94 + 0.06 * ph2)))
+  }
+  /* 完成：一次性白光闪 + 一圈扩散环（1.2s），状态回落由宿主负责 */
+  if (st === 'SUCCESS') {
+    /* 完成相位（循环内 burstT 时间轴）：收束 0~38% → 爆散 38~100% → 回归，总 ~1s。
+       用 r 表达 scale（不用 transform：SVG transform 属性与 CSS transform-origin 会叠成双轴心）。 */
+    var ft = (V2.freezeBurst === 'tight') ? 300 : (V2.freezeBurst === 'out' ? 700 : t)   /* 冻结通道：固定 t 抓两帧 */
+    var bt = Math.min(1, ft / 1000)
+    var pr8s = progRings()          /* 全部被渲染的克隆；pr8 只用于"有没有计划"与相位留痕 */
+    var pr8 = pr8s.length ? pr8s[0] : null
+    if (pr8 && pr8.getAttribute('opacity') !== '0') {   /* 没计划时环本来是隐藏的，不参与 */
+      var k = bt < 0.38 ? (1 - 0.07 * (bt / 0.38)) : (0.93 + 0.33 * ((bt - 0.38) / 0.62))   /* 收束→爆散 */
+      var rr = 88 * k
+      var _sw = (bt < 0.38 ? (3.5 + 2.5 * (bt / 0.38)) : (6 - 4.4 * ((bt - 0.38) / 0.62))).toFixed(2)
+      var _op = bt > 0.38 ? (0.95 - 0.4 * ((bt - 0.38) / 0.62)).toFixed(3) : null
+      /* dasharray 要跟着半径重算，否则完成度比例会漂 */
+      var dash = pr8.getAttribute('stroke-dasharray') || ''
+      var parts = dash.split(' ')
+      var _nd = null
+      if (parts.length === 2 && Number(parts[0]) > 0) {
+        var fr = Number(parts[0]) / (2 * Math.PI * 88)      /* 原完成度（按 r=88 算的） */
+        var C2 = 2 * Math.PI * rr
+        _nd = (C2 * fr).toFixed(1) + ' ' + C2.toFixed(1)
+      }
+      for (var _i = 0; _i < pr8s.length; _i++) {           /* 逐个克隆写：少写一个就有一层状态不显示环 */
+        pr8s[_i].setAttribute('r', rr.toFixed(2))
+        pr8s[_i].setAttribute('stroke-width', _sw)
+        if (_op !== null) pr8s[_i].setAttribute('opacity', _op)
+        if (_nd !== null) pr8s[_i].setAttribute('stroke-dasharray', _nd)
+      }
+    }
+    /* 辉光铺开 + 核心胀大（爆散期） */
+    var gA = layer.querySelector('.glowA'), gB = layer.querySelector('.glowB')
+    var gb = bt < 0.38 ? (0.2 + 0.5 * (bt / 0.38)) : (0.7 + 0.45 * ((bt - 0.38) / 0.62))
+    if (gA) gA.setAttribute('opacity', Math.min(1, core * gb).toFixed(3))
+    if (gB) gB.setAttribute('opacity', (bt < 0.38 ? 0 : Math.min(1, core * (gb - 0.7) * 2)).toFixed(3))
+    var bp = Math.min(1, ft / 1200)
+    var ring = layer.querySelector('.burst')
+    ring.setAttribute('r', (34 + 62 * bp).toFixed(2))
+    ring.setAttribute('stroke-width', (2 * (1 - 0.7 * bp)).toFixed(2))
+    ring.setAttribute('opacity', (0.9 * (1 - bp)).toFixed(3))
+    var fl = document.getElementById('flash')
+    fl.setAttribute('opacity', ft < 240 ? (0.6 * Math.sin(Math.PI * ft / 240)).toFixed(3) : '0')
+    setCore(layer, bt < 0.15 ? Math.min(1, core * (1 + 0.35 * Math.sin(Math.PI * bt / 0.15))) : (bt > 0.9 ? core * 0.9 : core))
+    /* 相位留痕（每相位只打一次，供断言） */
+    var phName = bt < 0.38 ? '收束' : '爆散'
+    if (A.burstPhase !== phName) { A.burstPhase = phName; BRIDGE.log('burst(loop): ' + phName + ' bt=' + bt.toFixed(2) + ' r=' + (pr8 ? pr8.getAttribute('r') : 'n/a')) }
+  } else if (A.burstPhase) { A.burstPhase = ''; BRIDGE.log('burst(loop): 回归（非完成态）') }
+  /* 出错：核心左右抖动 3 次（每次 ±2px / 80ms），之后停住 */
+  if (st === 'ERROR') {
+    var idx = Math.floor(t / 80)
+    var dx = idx < SHAKE.length ? SHAKE[idx] * 2 : 0
+    var cg = layer.querySelector('.core')
+    if (dx) cg.setAttribute('transform', 'translate(' + dx + ' 0)')
+    else cg.removeAttribute('transform')
+  }
+}
+
+/* ---------- 主进程下发的窗口几何 ---------- */
+function applyMetrics (m) {
+  ico.setAttribute('width', String(m.svgSize))
+  ico.setAttribute('height', String(m.svgSize))
+  document.body.style.opacity = String(m.opacity / 100)
+}
+
+/* ---------- 与主进程通讯 ---------- */
+BRIDGE.onMessage(function (msg) {
+  if (!msg || typeof msg.kind !== 'string') return
+  if (msg.kind === 'state') applyState(msg.state, msg)
+  else if (msg.kind === 'metrics') applyMetrics(msg)
+  else if (msg.kind === 'panel') { setPanel(!!msg.open, msg) }
+  else if (msg.kind === 'test-mouse') { runMouseSeq(msg.spec) }
+  else if (msg.kind === 'test-hover') { setHot(!!msg.on) }
+  else if (msg.kind === 'fps') { var fb = applyFpsBudget(msg.value); BRIDGE.log('fps-config -> ' + JSON.stringify(fb)) }
+  else if (msg.kind === 'hot') setHot(msg.inside)
+})
+
+/* ---------- 鼠标手势：**单击留给拖动，双击开关大面板**（用户 2026-09-12 定的模型）
+   用户的原话洞察：在可拖动元素上，单击本身就是有歧义的（点击 vs 拖动起点），
+   所以开关类操作交给双击，把单击完整地留给拖动。
+
+   判据（与 tests/panel-toggle.mjs 一一对应，改这里就要同步改测试）：
+     · 一次「点击」= 按下到抬起**累计位移 ≤ CLICK_PX(4)** 且 **时长 < CLICK_MS(500)**
+     · 两次「点击」间隔 ≤ DBL_MS(350) → 双击 → 切面板；否则只发 activate（单击不做别的）
+     · 一旦累计位移 > CLICK_PX（即真拖动）：**立即清空双击计时** —— 拖完不会被算成双击的前半段，
+       也不会把"拖一下"累积进去
+     · 拖动本身的语义完全不变：任何非零位移都立刻 dragBy（不设死区，避免手感变钝），
+       抬起时位移 > CLICK_PX → dragEnd（只有它会写位置记忆）                      */
+var CLICK_PX = 4, CLICK_MS = 500, DBL_MS = 350
+var dstate = { down: false, moved: 0, lx: 0, ly: 0, t0: 0, moves: 0 }
+var lastClickAt = 0
+/* ------------------------------------------------------------------ 面板滚动条手势（2026-09-13）
+   面板现在是可交互的（窗口侧判据 = 图标圆 ∪ 面板可见矩形），所以 #v2panel 右侧那条滚动条
+   必须能真的拖动。滚动条是**浏览器内部**画的，窗口里没有它的 DOM ⇒ 用几何判据：
+   指针落在 (#v2panel 内容盒右缘 → 边框盒右缘) 这一列里，就是"冲着滚动条去的"。
+   这时**不能让 #stage 的拖动逻辑把窗口拖走**（否则一拖滚动条，图标就跟着跑），
+   而是把整段 mousedown/mousemove/mouseup 原样留给 Chromium 的原生滚动条处理。
+   这是纯读判定 + 事件放行，**不合成任何输入**。 */
+var IS_SCROLL = false
+function scrollbarHit (cx, cy) {
+  var el = document.getElementById('v2panel')
+  if (!el || !panelOpen) return null
+  var r = el.getBoundingClientRect()
+  /* client 左缘 = 边框 + 左内边距；内容盒右缘 = 边框盒右缘 - 滚动条宽。
+     scrollbar-width:thin 下 (offsetWidth - clientWidth) 就是滚动条占的像素（实测 10）。 */
+  var sbw = el.offsetWidth - el.clientWidth
+  var contentRight = r.right - sbw
+  var byGeo = sbw >= 4 && cx >= contentRight - 1 && cx <= r.right + 1 && cy >= r.top && cy <= r.bottom
+  /* 几何判据为主；再用 elementFromPoint 做一次交叉验证（滚动条是 UA 影子内容，
+     命中它会返回容器自身）—— 两者取并集，避免把纯几何的边界算错。 */
+  var hit = byGeo
+  var byEl = false
+  try {
+    if (!hit) {
+      var at = document.elementFromPoint(cx, cy)
+      byEl = !!at && (at === el || el.contains(at))
+      hit = byEl
+    }
+  } catch (e) { /* ignore */ }
+  return { hit: hit, geo: byGeo, byEl: byEl, top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right), contentRight: Math.round(contentRight), sbw: sbw }
+}
+
+function hDown (x, y, cx, cy) {
+  dstate.down = true; dstate.moved = 0; dstate.moves = 0
+  dstate.lx = x; dstate.ly = y; dstate.t0 = Date.now()
+  var sb = scrollbarHit(cx, cy)
+  IS_SCROLL = !!(sb && sb.hit)
+  BRIDGE.log('mousedown screen=' + x + ',' + y + ' client=' + cx + ',' + cy +
+    ' scrollbar-hit=' + IS_SCROLL + (sb ? ' contentRight=' + sb.contentRight + ' sbw=' + sb.sbw : ''))
+}
+function hMove (x, y, mx, my) {
+  if (!dstate.down) return
+  if (IS_SCROLL) return       /* 滚动条手势：位移留给 Chromium 原生滚动条，绝不当成拖窗口 */
+  dstate.moves++
+  var dx = Math.round(x - dstate.lx), dy = Math.round(y - dstate.ly)
+  if (dstate.moves <= 3 || (!dx && !dy && dstate.moves < 6)) {
+    BRIDGE.log('mousemove#' + dstate.moves + ' screen=' + x + ',' + y + ' movement=' + mx + ',' + my + ' delta=' + dx + ',' + dy)
+  }
+  if (!dx && !dy) { dx = Math.round(mx || 0); dy = Math.round(my || 0) }
+  if (dx || dy) {
+    dstate.lx = x; dstate.ly = y
+    dstate.moved += Math.abs(dx) + Math.abs(dy)
+    if (dstate.moved > CLICK_PX) lastClickAt = 0      /* 真拖动 ⇒ 双击计时作废 */
+    BRIDGE.dragBy(dx, dy)                             /* 拖动语义与改动前逐字一致 */
+  }
+}
+function hUp () {
+  if (!dstate.down) return
+  dstate.down = false
+  if (IS_SCROLL) {
+    /* 滚动条手势收尾：不 activate、不 dragEnd（位置记忆不被污染） */
+    BRIDGE.log('mouseup scrollbar-drag-end moved=' + dstate.moved + ' moves=' + dstate.moves)
+    IS_SCROLL = false
+    return
+  }
+  var dt = Date.now() - dstate.t0
+  BRIDGE.log('mouseup moved=' + dstate.moved + ' moves=' + dstate.moves + ' dt=' + dt)
+  if (dstate.moved <= CLICK_PX && dt < CLICK_MS) {
+    BRIDGE.activate()                                 /* 单击：只做"人处理了"的确认（ERROR 态），不聚焦、不切面板 */
+    var now = Date.now()
+    if (now - lastClickAt <= DBL_MS) { lastClickAt = 0; BRIDGE.log('double-click -> toggle panel'); BRIDGE.togglePanel() }
+    else lastClickAt = now
+  } else {
+    BRIDGE.dragEnd()                                  /* 只有真正的拖动才结束拖动（写位置记忆） */
+  }
+}
+stage.addEventListener('mousedown', function (e) {
+  if (e.button !== 0) return
+  hDown(e.screenX, e.screenY, e.clientX, e.clientY)
+})
+window.addEventListener('mousemove', function (e) { hMove(e.screenX, e.screenY, e.movementX, e.movementY) })
+window.addEventListener('mouseup', function () { hUp() })
+
+/* 离屏测试钩子：灌一段"鼠标脚本"走**同一套** hDown/hMove/hUp（不合成任何真实输入）
+   格式 "间隔ms|d,x,y;m,x,y;u,x,y|d,x,y;m,x,y;u,x,y" */
+function runMouseSeq (spec) {
+  var parts = String(spec).split('|')
+  var gap = Math.max(0, Number(parts[0]) || 160)
+  var segs = parts.slice(1), i = 0
+  function step () {
+    if (i >= segs.length) { BRIDGE.log('test-mouse done segs=' + segs.length); return }
+    var frames = segs[i++].split(';')
+    for (var j = 0; j < frames.length; j++) {
+      var f = frames[j].split(','), op = f[0]
+      if (op === 'd') hDown(+f[1], +f[2], +f[1], +f[2])
+      else if (op === 'm') hMove(+f[1], +f[2], 0, 0)
+      else if (op === 'u') hUp()
+    }
+    setTimeout(step, gap)
+  }
+  step()
+}
+
+/* ================= 完整面板（③-2 定稿）=================
+   2026-09-12 定稿：**440 宽 / 底板 α 0.78**（α 由主进程 PANEL_ALPHA 下发，将来做成 window.panelAlpha）。
+   ⚠️ α 0.78 的代价（实测）：浅色壁纸下明细行 3.5:1、微标签 3.3:1（低于 AA 4.5）；深色/蓝调壁纸全绿。
+      用户已知情接受，因为将来可自行调。
+   数据：宿主协议 v2 还没落地，这里先用**示例内容**；接数据时把宿主载荷塞进 panelData 再 renderPanel()。 */
+var PANEL = { w: 440, h: 340, top: 185, alpha: 0.78 }
+var panelOpen = false
+var PC = { act: '#56d9c8', money: '#ffc266', metric: '#9ad4ff', think: '#9fb0c4', task: '#b79cff', ink: '#e8f0fa', dim: '#98b0c6' }
+/* 分区色的「**文字档**」（2026-09-13 用户拍板：提亮到达标）。
+   口径：**色相不变、只提亮度** —— 8.5~10.5px 小字要在浅色壁纸的最亮边界上过 4.5:1。
+   只有**当文字色用**的地方取它；PC 里的原值继续供**图形与装饰**使用（一个字节都不动）：
+   .live i 圆点、.v2ruler i.on 刻度、.v2bullet .bs、.trow .ic.run 状态点、.trow.hot::before 竖条、
+   progRing / .seg 的 stroke、以及 .sec 的 border-left-color。
+   `metric`（淡蓝=度量数值）本身**只当文字色用**（只被 metric() 取），所以直接存提亮值。 */
+var PTEXT = { '#56d9c8': '#7fe3c8' }
+/* 真实数据（宿主 v2 载荷）。**禁止示例数据**：没有真实来源的字段一律不画。
+   历史：v2 未落地前这里曾是示例内容；现已接真数据 —— 假数据与真数据同屏会误导判断。 */
+var panelData = null
+function fmtDur (ms) {
+  if (typeof ms !== 'number' || !isFinite(ms) || ms < 0) return '\u2014'
+  var s = Math.round(ms / 1000)
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0')
+}
+function panelDataFromV2 () {
+  var pr = V2.progress, m = V2.metrics, sa = V2.subagents, tk = V2.tokens
+  var td = V2.todos, ct = V2.context, co = V2.cost, tx = V2.text
+  var items = (td && Array.isArray(td.items)) ? td.items : []
+  var elapsed = (m && typeof m.elapsedMs === 'number') ? m.elapsedMs : null
+  var turns = (m && typeof m.turns === 'number') ? m.turns : null
+  var costOk = !!(co && co.status === 'ok' && co.cost && typeof co.cost.CNY === 'number')
+  return {
+    hasData: !!(pr || m || sa || tk || td || ct || co || tx),
+    action: (typeof V2.activity === 'string' && V2.activity) ? V2.activity : '\u2014',
+    stateText: V2.stateName ? (LAB[V2.stateName] || V2.stateName) : '\u2014',
+    elapsed: fmtDur(elapsed), step: turns === null ? '\u2014' : String(turns),
+    avg: (elapsed && turns) ? (elapsed / 1000 / turns).toFixed(1) : '\u2014',
+    think: [tx && tx.thoughtTail, tx && tx.bodyTail].filter(Boolean),
+    /* 花费：只有宿主显式给了 ok + 金额才显示；否则 unavail=true（不画 ¥0.00） */
+    cost: costOk ? co.cost.CNY.toFixed(2) : null,
+    unavail: !!co && !costOk,
+    unpriced: (co && typeof co.unpriced === 'number') ? co.unpriced : 0,
+    tokIn: (tk && typeof tk.input === 'number') ? +(tk.input / 1000).toFixed(1) : null,
+    tokOut: (tk && typeof tk.output === 'number') ? +(tk.output / 1000).toFixed(1) : null,
+    tokAll: (tk && typeof tk.total === 'number') ? +(tk.total / 1000).toFixed(1) : null,
+    ctx: (ct && ct.applicable === true && typeof ct.ratio === 'number') ? Math.max(0, Math.min(1, ct.ratio)) : null,
+    ctxText: (ct && ct.applicable === true && typeof ct.ratio === 'number') ? (Math.round(ct.ratio * 1000) / 10 + '%') : null,
+    ctxUsed: (ct && ct.applicable === true && typeof ct.used === 'number' && typeof ct.limit === 'number') ? (ct.used + ' / ' + ct.limit) : null,
+    subs: (sa && typeof sa.running === 'number') ? (sa.running + (typeof sa.total === 'number' ? ' / ' + sa.total : '')) : null,
+    subsP: (sa && typeof sa.total === 'number' && sa.total > 0) ? Math.max(0, Math.min(1, sa.done / sa.total)) : null,
+    tasks: items.slice(0, 6).map(function (it, i) {
+      var k = it.status === 'done' ? 'done' : it.status === 'in_progress' ? 'doing' : 'todo'
+      return [String(i + 1).padStart(2, '0'), k, it.content || '\u2014']
+    }),
+    progress: (pr && pr.applicable === true && typeof pr.total === 'number' && pr.total > 0) ? (pr.done / pr.total) : null,
+    progText: (pr && pr.applicable === true && typeof pr.done === 'number' && typeof pr.total === 'number') ? (pr.done + ' / ' + pr.total + (pr.inProgress ? ' 跑着 ' + pr.inProgress : '')) : null
+  }
+}
+/* ---- 图形件（每值配形的实现；SVG 全部预生成，运行时零逐帧计算）---- */
+function sSpark (v, col, w, h) {
+  var s = ''
+  for (var i = 0; i < v.length; i++) {
+    var bh = Math.max(1.5, v[i] * h)
+    s += '<rect x="' + (i * (w / v.length)).toFixed(1) + '" y="' + (h - bh).toFixed(1) + '" width="' + (w / v.length - 1.6).toFixed(1) +
+      '" height="' + bh.toFixed(1) + '" rx="0.6" fill="' + col + '" opacity="' + (0.3 + 0.7 * (i / (v.length - 1))).toFixed(2) + '"/>'
+  }
+  return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + s + '</svg>'
+}
+function sTicks (lit, total, col, dim, w) {
+  var s = ''
+  for (var i = 0; i < total; i++) {
+    var on = i < lit, big = i % 5 === 0
+    s += '<rect x="' + (i * (w / total)).toFixed(1) + '" y="' + (big ? 0 : 2.4) + '" width="1.4" height="' + (big ? 9 : 4.2) +
+      '" fill="' + (on ? col : dim) + '" opacity="' + (on ? 0.95 : 0.5) + '"/>'
+  }
+  return '<svg width="' + w + '" height="9" viewBox="0 0 ' + w + ' 9" style="vertical-align:-2px">' + s + '</svg>'
+}
+function sRing (p, col, size, label) {
+  var r = (size - 9) / 2, c = 2 * Math.PI * r, cx = size / 2
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" style="vertical-align:middle">' +
+    '<circle cx="' + cx + '" cy="' + cx + '" r="' + r + '" fill="none" stroke="#9dc4e6" stroke-opacity=".18" stroke-width="2.6"/>' +
+    '<circle cx="' + cx + '" cy="' + cx + '" r="' + r + '" fill="none" stroke="' + col + '" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="' +
+    (c * p).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 ' + cx + ' ' + cx + ')"/>' +
+    '<text x="' + cx + '" y="' + (cx + 3.4) + '" text-anchor="middle" fill="' + col + '" style="font:400 9.5px ui-monospace,Consolas,monospace">' + label + '</text></svg>'
+}
+function sBar (p, col, w, h) {
+  return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' +
+    '<rect width="' + w + '" height="' + h + '" rx="1" fill="#9dc4e6" opacity=".14"/>' +
+    '<rect width="' + (w * p).toFixed(1) + '" height="' + h + '" rx="1" fill="' + col + '"/></svg>'
+}
+function sSegs (tasks, w) {
+  var seg = (w - (tasks.length - 1) * 3) / tasks.length, s = ''
+  for (var i = 0; i < tasks.length; i++) {
+    var k = tasks[i][1]
+    var col = k === 'done' ? PC.task : k === 'doing' ? PC.money : '#9dc4e6'
+    s += '<rect x="' + (i * (seg + 3)).toFixed(1) + '" y="0" width="' + seg.toFixed(1) + '" height="6" rx="1" fill="' + col + '" opacity="' + (k === 'todo' ? 0.22 : 1) + '"/>'
+  }
+  return '<svg width="' + w + '" height="6" viewBox="0 0 ' + w + ' 6">' + s + '</svg>'
+}
+function sPlateBg (w, h) {
+  var s = '', x, y
+  for (x = 22; x < w; x += 22) s += '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + h + '" stroke="#9dc4e6" stroke-width="1" opacity=".035"/>'
+  for (y = 22; y < h; y += 22) s += '<line x1="0" y1="' + y + '" x2="' + w + '" y2="' + y + '" stroke="#9dc4e6" stroke-width="1" opacity=".035"/>'
+  for (var i = 1; i < 4; i++) s += '<line x1="' + (w * i / 4) + '" y1="10" x2="' + (w * i / 4) + '" y2="' + (h - 10) + '" stroke="#9dc4e6" stroke-width="1" opacity=".07"/>'
+  for (y = 6; y < h - 6; y += 7) {
+    var L = (y - 6) % 35 === 0
+    s += '<line x1="13" y1="' + y + '" x2="' + (13 + (L ? 7 : 3)) + '" y2="' + y + '" stroke="#31536e" stroke-width="1"/>'
+    s += '<line x1="' + (w - 13) + '" y1="' + y + '" x2="' + (w - 13 - (L ? 7 : 3)) + '" y2="' + y + '" stroke="#31536e" stroke-width="1"/>'
+  }
+  return s
+}
+function sLeads () { return '' }   /* 引线标签退掉：它指向的花费/上下文已由 v2 面板负责，再画就是重影 */
+function renderPanel () {
+  var d = panelDataFromV2()
+  /* 断开/无数据时**保留最后一帧**（用户看不到"数据被清空"）：
+     只有**从未收到过任何 state** 才允许显示「等待宿主数据」。 */
+  if (d.hasData) { V2.lastGood = d; V2.lastGoodAt = Date.now() }
+  var staleSec = 0
+  if (!d.hasData && V2.lastGood && V2.lastGoodAt) {
+    d = V2.lastGood
+    staleSec = Math.round((Date.now() - V2.lastGoodAt) / 1000)
+    d = Object.assign({}, d, { staleSec: staleSec })
+  }
+  panelData = d
+  var host = document.getElementById('plateInner')
+  if (!host) return
+  if (!d.hasData) {
+    var stN = V2.stateName ? (LAB[V2.stateName] || V2.stateName) : '空闲'
+    host.innerHTML =
+      '<div class="ph"><span class="live"><i></i><i></i><i></i></span><span class="kick">工作图标 · ' + (d.staleSec > 0 ? ('数据已 ' + d.staleSec + 's 未更新') : '实时') + '</span>' +
+      '<span class="he">' + stN + '</span></div>' +
+      '<div class="empty">' +
+        '<div class="ebig">等待宿主数据</div>' +
+        '<div class="esub">窗口已就绪，宿主还没有下发状态</div>' +
+        '<div class="eline"></div>' +
+        '<div class="esub2">下发后这里会出现：进度 · 子代理树 · 任务 · 花费 · 上下文</div>' +
+      '</div>'
+    BRIDGE.log('plate nodata: 等待宿主数据（空状态；不画任何数字）')
+    logPanelText('nodata')
+  try { logPanelLayout('nodata') } catch (e3) { BRIDGE.log('logPanelLayout ERR: ' + e3.message) }
+    return
+  }
+  /* 陈旧标注：数据是上一帧的 ⇒ 明说"已 Xs 未更新"，而不是显示"等待宿主数据" */
+  if (d.staleSec > 0) {
+    BRIDGE.log('plate stale: 保留最后一帧（数据已 ' + d.staleSec + 's 未更新）')
+  }
+  function sec (col, title, right, inner) {
+    return '<div class="sec" style="border-left-color:' + col + '"><div class="sh"><span class="sl" style="color:' + (PTEXT[col] || col) + '">' + title +
+      '</span><span class="sr">' + right + '</span></div>' + inner + '</div>'
+  }
+  function metric (l, v, u, col) {
+    if (v === null || v === undefined || v === '—') return ''
+    return '<span class="mt"><b class="ml">' + l + '</b><b class="mv" style="color:' + col + '">' + v + '</b><i class="mu">' + u + '</i></span>'
+  }
+  /* 一个面板一个渲染器：样板只保留**独有**内容（图标状态 / 动作行 / 进度时间轴 / 词元行）。
+     花费 · 上下文占用 · 子代理 · 任务 · 文本 由 v2 面板负责，样板再画就是重影。 */
+  host.innerHTML =
+    '<div class="ph"><span class="live"><i></i><i></i><i></i></span><span class="kick">工作图标 · 实时</span>' +
+    '<span class="he">' + d.elapsed + ' · ' + d.step + ' 轮' + (d.avg !== '—' ? ' · ' + d.avg + 's/轮' : '') + '</span></div>' +
+    sec(PC.act, '动作', '',
+      '<div class="tl"><b class="t1">' + d.action + '</b> · ' + d.stateText + '</div>' +
+      (d.progText ? '<div class="tstrip">' + sSegs(d.tasks, 220) + '<span class="slab">' + d.progText + '</span></div>' : '')) +
+    ((d.tokIn !== null || d.tokOut !== null || d.tokAll !== null)
+      ? '<div class="mrow" style="margin-top:4px"><div class="mgrid" style="grid-template-columns:repeat(3,1fr)">' +
+        metric('输入', d.tokIn, 'k', PC.metric) + metric('输出', d.tokOut, 'k', PC.metric) + metric('合计', d.tokAll, 'k', PC.ink) +
+        '</div></div>' : '')
+  BRIDGE.log('plate text[' + ((host.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)) + ']')
+  BRIDGE.log('plate real: cost=' + (d.cost === null ? (d.unavail ? 'unavail' : 'none') : '¥' + d.cost) +
+    ' ctx=' + (d.ctx === null ? 'none' : d.ctxText) + ' tok=' + (d.tokAll === null ? 'none' : d.tokAll) +
+    ' elapsed=' + d.elapsed + ' step=' + d.step + ' plate=own-blocks-only')
+  logPanelText('real')
+}
+/* 几何自检：把"文字出界 / 互相压住"变成可断言的数字（人眼只看结论）。 */
+
+/* v2 面板定位：紧贴样板内容的**实际底部**（不再用魔法数字 px，避免内容变化后重新压字）。
+   受影响：top / maxHeight。窗口几何不动（只动 v2 面板自身，它在窗口内）。 */
+function v2PlaceUnderPlate () {
+  var host = document.getElementById('v2panel')
+  var inner = document.getElementById('plateInner')
+  var plate = document.getElementById('plate')
+  if (!host || !inner || !plate) return
+  var bodyTop = document.body.getBoundingClientRect().top
+  var innerB = inner.getBoundingClientRect().bottom - bodyTop
+  var plateB = plate.getBoundingClientRect().bottom - bodyTop
+  var top = Math.ceil(innerB + 8)
+  host.style.top = top + 'px'
+  host.style.maxHeight = Math.max(80, Math.floor(plateB - top - 8)) + 'px'
+  BRIDGE.log('v2 place: top=' + top + ' maxH=' + Math.floor(plateB - top - 8) + ' (plateInnerBottom=' + Math.round(innerB) + ', plateBottom=' + Math.round(plateB) + ')')
+}
+function logPanelLayout (tag) {
+  /* 可见文本块清单 + 出界/重叠判定。只判可见块：滚出容器可视区的不占屏，不参与判定。 */
+  /* 叶子文本元素（覆盖到真正承载文字的节点，容器由 leaf 规则排除） */
+  var SEL = '#plateInner .ph,#plateInner .tl,#plateInner .sh,#plateInner .sh .sl,#plateInner .sh .sr,#plateInner .t1,#plateInner .mt .ml,#plateInner .mt .mv,#plateInner .mt .mu,#plateInner .ebig,#plateInner .esub,#plateInner .esub2,#plateInner .slab,#plateInner .mk,#plateInner .tt,#plateInner .ix'
+  var PANEL_SEL = '#v2panel .ph2,#v2panel .trow .tt,#v2panel .trow .mk,#v2panel .trow .tw,#v2panel .sh,#v2panel .mt,#v2panel .trow2 .tt,#v2panel .trow2 .mk,#v2panel .trow2 .tw,#v2panel .tx,#v2panel .srow,#v2panel .fold,#v2panel .plan,#v2panel .cwlab'
+  /* 三层各量各自的容器（同一类 bug 第 3 次）：面板块 ⇒ 黑板；面板块 ⇒ #v2panel 自己的盒子；
+     hover 块 ⇒ 视口。判据里绝不允许"用 A 的盒子量 B 的元素"。 */
+  var HOVER_SEL = '#v2hover  .st,#v2hover .h3,#v2hover .bl,#v2hover .pt'   /* .tok2 已随代理指标行搬走（2026-09-19 D） */
+  var plate = document.getElementById('plate')
+  var pr = plate ? plate.getBoundingClientRect() : null
+  var blocks = []
+  /* ③ 方案 A：两层各量各自的容器 —— 面板调用只看面板块表（黑板坐标系），
+     hover 调用只看 hover 自己的块表（量视口），否则 hover 的字会被拿黑板去量 ⇒ outside=2（真实日志实测） */
+  /* v2 面板块：**单独一趟**，用 #v2panel 自己的盒子当参照（不再拿黑板量）。
+     ⚠️ 2026-09-19（任务 G）修复：这一段原来被写在下面那个 forEach 的**回调体内部**，
+     于是"每个 SEL 元素都把整份 PANEL_SEL 又量一遍" ⇒ 同一渲染周期内同一 block 被重复打印。
+     实测（用户生产 helper.log，段 3066..4245 行）：一次 `panel layout(after-v2)` 周期里
+     8 个 block × **15 次** = 120 行；50 秒内 1440 行，占该窗口全部日志 66%。
+     现在提到回调**外面**：一次 logPanelLayout = 一趟，每个 block 恰好 1 条（留痕能力一字未减）。 */
+  if (tag !== 'hover') (function () {
+    var _v2h = document.getElementById('v2panel')
+    var _v2r = _v2h ? _v2h.getBoundingClientRect() : null
+    if (!_v2r) return
+    Array.prototype.forEach.call(document.querySelectorAll(PANEL_SEL), function (el) {
+      var r = el.getBoundingClientRect()
+      if (r.width < 1 || r.height < 1) return
+      var txt = (el.textContent || '').replace(/\s+/g, ' ').trim()
+      if (!txt) return
+      var inWin = (r.left >= -1 && r.top >= -1 && r.right <= window.innerWidth + 1 && r.bottom <= window.innerHeight + 1)
+      var inBox = (r.left >= _v2r.left - 1 && r.right <= _v2r.right + 1 && r.top >= _v2r.top - 1 && r.bottom <= _v2r.bottom + 1)
+      BRIDGE.log('v2panel blk(' + tag + '): ' + txt.slice(0, 24) + '|' + Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.width) + 'x' + Math.round(r.height) + '|inBox=' + inBox + '|inWin=' + inWin)
+    })
+  })()
+  Array.prototype.forEach.call(document.querySelectorAll(tag === 'hover' ? HOVER_SEL : SEL), function (el) {
+    var r = el.getBoundingClientRect()
+    if (r.width < 1 || r.height < 1) return
+    var cs = window.getComputedStyle(el)
+    if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) === 0) return
+    /* 容器可视区（滚出可视区的块不参与） */
+    var host = el.closest('#v2panel') || el.closest('#v2hover') || el.closest('#plateInner') || plate
+    var hr = host ? host.getBoundingClientRect() : null
+    if (hr) {
+      var visW = Math.min(r.right, hr.right) - Math.max(r.left, hr.left)
+      var visH = Math.min(r.bottom, hr.bottom) - Math.max(r.top, hr.top)
+      if (visW <= 1 || visH <= 1) return          /* 几乎完全滚出可视区 ⇒ 跳过 */
+    }
+    var txt = (el.textContent || '').replace(/\s+/g, ' ').trim()
+    if (!txt) return
+    /* 只量**叶子文本块**：容器元素（.ph / .mt 等）自身继承黑色，真正上色的是子元素 ——
+       量容器会得到 rgb(0,0,0) 的假结论，也会与子块重复计一次重叠。 */
+    var kids = Array.prototype.filter.call(el.children, function (c) { return (c.textContent || '').trim() })
+    if (kids.length) return
+    blocks.push({ el: el, r: r, t: txt.slice(0, 20), c: cs.color, s: cs.fontSize })
+  })
+  var outside = 0, firstOut = ''
+  if (pr) blocks.forEach(function (o) {
+    var ref = (tag === 'hover' || !pr || pr.width < 1) ? { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight } : pr   /* 悬浮层/面板关闭时以**视口**为基准（黑板 0×0 时量它必然错） */
+    if (o.r.bottom > ref.bottom + 1 || o.r.top < ref.top - 1 || o.r.right > ref.right + 1 || o.r.left < ref.left - 1) {
+      outside++
+      if (!firstOut) firstOut = '「' + o.t + '」' + Math.round(o.r.left) + ',' + Math.round(o.r.top) + '~' + Math.round(o.r.right) + ',' + Math.round(o.r.bottom)
+    }
+  })
+  var pairs = []
+  for (var i = 0; i < blocks.length; i++) {
+    for (var j = i + 1; j < blocks.length; j++) {
+      var A = blocks[i].r, B = blocks[j].r
+      var ox = Math.min(A.right, B.right) - Math.max(A.left, B.left)
+      var oy = Math.min(A.bottom, B.bottom) - Math.max(A.top, B.top)
+      /* 同一段落内的父子/同容器兄弟不算（例如 .tr 内含 .mk/.tt）；只报"跨区块"的真实叠字 */
+      if (ox > 2 && oy > 2 && !blocks[i].el.contains(blocks[j].el) && !blocks[j].el.contains(blocks[i].el)) {
+        pairs.push(blocks[i].t + '⋂' + blocks[j].t + '@' + Math.round(ox) + 'x' + Math.round(oy))
+      }
+    }
+  }
+  BRIDGE.log('panel layout(' + tag + '): rects=' + blocks.length + ' outside=' + outside + ' overlaps=' + pairs.length +
+    (outside ? ' firstOut=' + firstOut : '') + (pairs.length ? ' [' + pairs.slice(0, 8).join(' ; ') + ']' : ''))
+  /* 机器可读明细：t~x,y,w,h,color,fontsize */
+  var dump = blocks.slice(0, 40).map(function (o) {
+    return o.t + '|' + Math.round(o.r.left) + '|' + Math.round(o.r.top) + '|' + Math.round(o.r.width) + '|' + Math.round(o.r.height) + '|' + o.c.replace(/\s/g, '') + '|' + o.s
+  })
+  BRIDGE.log('panel blocks(' + tag + '): ' + dump.join(' ; '))
+  /* 取色测试：面板**这一轮渲染真的画出来之后**（after-v2 / nodata 都算）打印一次逐元素取色清单。
+     放在这里而不是启动定时器，是因为数据是异步喂进来的 —— 早打印会得到 0 块（等于什么都没测）。 */
+  if (__PROBE_ON && window.__probePanel) {
+    window.__probeDone = true
+    try { window.__probePanel(tag) } catch (e) { BRIDGE.log('probe ERR: ' + (e && e.message ? e.message : String(e))) }
+  }
+  /* 实测留痕：悬浮层几何 + 窗口 vs 悬浮层（用于判定"被窗口裁掉"）+ 以视口为基准的出界数 */
+  var hv = document.getElementById('v2hover')
+  if (hv) {
+    var hvr = hv.getBoundingClientRect()
+    var ico = document.getElementById('ico')
+    var ir = ico ? ico.getBoundingClientRect() : null
+    var vw = window.innerWidth, vh = window.innerHeight
+    BRIDGE.log('hover geom(' + tag + '): win=' + vw + 'x' + vh +
+      ' hover=' + Math.round(hvr.left) + ',' + Math.round(hvr.top) + ',' + Math.round(hvr.width) + 'x' + Math.round(hvr.height) +
+      ' overflowRight=' + Math.round(hvr.right - vw) + ' overflowBottom=' + Math.round(hvr.bottom - vh) +
+      ' display=' + window.getComputedStyle(hv).display +
+      (ir ? ' icon=' + Math.round(ir.left) + ',' + Math.round(ir.top) + ',' + Math.round(ir.width) + 'x' + Math.round(ir.height) : ''))
+    var outV = blocks.filter(function (o) { return o.r.right > vw + 1 || o.r.bottom > vh + 1 || o.r.left < -1 || o.r.top < -1 }).length
+    var outP = blocks.filter(function (o) { return pr && (o.r.right > pr.right + 1 || o.r.bottom > pr.bottom + 1 || o.r.left < pr.left - 1 || o.r.top < pr.top - 1) }).length
+    BRIDGE.log('hover viewport(' + tag + '): blocks=' + blocks.length + ' outsideViewport=' + outV + ' outsidePlate=' + outP + ' plateW=' + (pr ? Math.round(pr.width) : -1))
+  }
+  if (pr) {
+    BRIDGE.log('panel plate(' + tag + '): ' + Math.round(pr.left) + ',' + Math.round(pr.top) + ',' + Math.round(pr.width) + ',' + Math.round(pr.height) + ' dpr=' + (window.devicePixelRatio || 1))
+    /* 面板可见矩形的**真实布局**上报给主进程 ⇒ 它才是命中区（图标圆 ∪ 面板矩形）用的那一块。
+       ⚠️ 不用窗口矩形顶替：窗口 vs 黑板差的那几像素正是"面板周围的透明角算不算可交互"。
+       ⚠️ 只在**面板真的开着**时上报：面板关闭时板子还没摆到 --panel-top 上（top=0），
+          报出去会让主进程拿错位矩形判据 ⇒ 面板顶那几十像素被误判成穿透（panel-toggle ⑤ 实测抓到过）。 */
+    if (panelOpen) {
+      try { BRIDGE.panelHitRect({ left: pr.left, top: pr.top, right: pr.right, bottom: pr.bottom }) } catch (e) { BRIDGE.log('panelHitRect 上报失败: ' + (e && e.message)) }
+    }
+  }
+  /* 滚动条可拖的可核对证据：内容有没有真的溢出、滚动条占了几像素。
+     这条是"右侧那条滚动条到底能不能拖"的**前提**（没溢出就没有可拖的滑块）。 */
+  var v2p = document.getElementById('v2panel')
+  if (v2p && panelOpen) {
+    var sbw = v2p.offsetWidth - v2p.clientWidth
+    BRIDGE.log('panel scroll(' + tag + '): scrollH=' + v2p.scrollHeight + ' clientH=' + v2p.clientHeight +
+      ' scrollW=' + sbw + ' scrollTop=' + Math.round(v2p.scrollTop) +
+      ' scrollable=' + (v2p.scrollHeight > v2p.clientHeight) +
+      ' box=' + Math.round(v2p.getBoundingClientRect().left) + ',' + Math.round(v2p.getBoundingClientRect().top) + ',' +
+      Math.round(v2p.getBoundingClientRect().width) + 'x' + Math.round(v2p.getBoundingClientRect().height))
+  } else if (v2p) {
+    BRIDGE.log('panel scroll(' + tag + '): panelOpen=false（收起态不做命中）')
+  }
+}
+function logPanelText (tag) {
+  /* 用户实际看到的是两层：#plateInner（样板独有区）+ #v2panel（四字段区）。
+     两层都要量 —— 只量 #panel 会漏掉 v2 段（它们是兄弟节点）。 */
+  var parts = []
+  ;['plateInner', 'v2panel'].forEach(function (id) {
+    var el = document.getElementById(id)
+    if (el && el.textContent) parts.push(el.textContent.replace(/\s+/g, ' ').trim())
+  })
+  var txt = parts.join(' | ')
+  BRIDGE.log('panel text(' + tag + ') len=' + txt.length + ' :: ' + txt.slice(0, 400))
+}
+function setPanel (open, g) {
+  if (!g) return
+  if (g.w) {
+    var r = document.documentElement.style
+    r.setProperty('--win-w', g.w + 'px'); r.setProperty('--win-h', g.h + 'px')
+    r.setProperty('--icon-win', g.iconWin + 'px'); r.setProperty('--panel-top', g.panelTop + 'px')
+    r.setProperty('--panel-w', g.panelW + 'px'); r.setProperty('--panel-h', g.panelH + 'px')
+    r.setProperty('--panel-alpha', String(g.alpha))
+    PANEL.w = g.panelW; PANEL.h = g.panelH; PANEL.top = g.panelTop; PANEL.alpha = g.alpha
+    var pl = document.getElementById('plate')
+    pl.style.width = g.panelW + 'px'; pl.style.height = g.panelH + 'px'
+    document.getElementById('plateBg').setAttribute('viewBox', '0 0 ' + g.panelW + ' ' + g.panelH)
+    document.getElementById('plateBg').innerHTML = sPlateBg(g.panelW, g.panelH)
+    document.getElementById('plateBg').setAttribute('width', g.panelW); document.getElementById('plateBg').setAttribute('height', g.panelH)
+    var lv = document.getElementById('leads')
+    lv.setAttribute('viewBox', '0 0 ' + g.w + ' ' + g.h)
+    lv.innerHTML = sLeads(g.w / 2, g.iconWin / 2)
+  }
+  panelOpen = !!open
+  if (panelOpen) renderPanel()
+  document.body.classList.toggle('panel-open', panelOpen)
+  BRIDGE.log('panel ' + (panelOpen ? 'OPEN' : 'CLOSED') + ' win=' + (g.w || '?') + 'x' + (g.h || '?') + ' alpha=' + (g.alpha || '?'))
+}
+window.__panelState = function () { return { open: panelOpen, w: PANEL.w, h: PANEL.h, alpha: PANEL.alpha, dbl: DBL_MS, clickPx: CLICK_PX } }
+window.addEventListener('contextmenu', function (e) { e.preventDefault(); BRIDGE.menu(e.clientX, e.clientY) })
+
+/* ---------- 首帧 / 帧率 ----------
+   注意：这条 rAF 自转循环本身就会让合成器按刷新率一直产帧，所以**只在需要测帧率时才启动**
+   （主进程不给 --fps-log 时，渲染层不排任何 rAF，空闲时零产帧）。 */
+var frames = 0, mark = performance.now(), first = true, fpsOn = (Q.get('fps') === '1')
+function loop () {
+  frames++
+  if (first) { first = false; BRIDGE.painted() }
+  var now = performance.now()
+  if (now - mark >= 2000) { BRIDGE.fps(frames, frames / ((now - mark) / 1000), drvFrames); frames = 0; drvFrames = 0; mark = now }
+  if (fpsOn) requestAnimationFrame(loop)
+}
+if (fpsOn) requestAnimationFrame(loop)
+else setTimeout(function () { BRIDGE.painted() }, 30)
+
+/* ---------- 初始化 ---------- */
+/* 底板深浅档（见 style 里的 `body.plate-*`）。生产默认档就是下面这一个常量：
+   要换成别的档，只改这一个字母（a/b/c），CSS 里的四段渐变与配套文字档会一起跟着换。 */
+var PLATE_TIER = 'b'
+var __BGQ = String(Q.get('bg') || '')
+var __TIER_SRC = 'css-default'
+if (__BGQ === 'dark') document.body.classList.add('bg-dark')
+else if (__BGQ === 'white') document.body.classList.add('bg-white')
+else if (/^plate-(t0|a|b|c)$/.test(__BGQ)) { PLATE_TIER = __BGQ.slice(6); __TIER_SRC = 'arg' }
+if (/^[abc]$/.test(PLATE_TIER)) __TIER_SRC = (__TIER_SRC === 'arg' ? 'arg' : 'platetier')
+document.body.classList.add('plate-' + PLATE_TIER)
+/* 文字档里的两个"分区色当文字用"的档位（青=动作 / 淡蓝=度量数值）在 CSS 变量里只有一份真源，
+   JS 侧读回来喂给 PC/PTEXT —— 避免同一组色值在 CSS 与 JS 里各写一遍而漂移。 */
+;(function () {
+  var cs = window.getComputedStyle(document.body)
+  function g (n) { var v = cs.getPropertyValue(n); return v && v.trim() ? v.trim() : '' }
+  if (g('--met')) PC.metric = g('--met')
+  if (g('--ink2')) PC.ink = g('--ink2')
+  if (g('--act')) PTEXT['#56d9c8'] = g('--act')
+  BRIDGE.log('plate tier=' + PLATE_TIER + ' source=' + __TIER_SRC + ' p0=' + g('--p0') + ' ink=' + g('--ink') +
+    ' act=' + g('--act') + ' met=' + g('--met'))
+})()
+/* 取色测试用：把壁纸铺在窗口底下，量「半透明黑板 α 叠在浅色壁纸之上」的**真实合成对比度**。
+   为什么借 hide 通道 + 十六进制：背景只能由渲染层决定（主进程 backgroundColor 属另一平面），
+   而 main.js 的 loadFile 只转发一份固定白名单查询参数（state/svg/pad/opacity/scale/shot/bg/fps/spin/hide），
+   新加一个 --wallpaper / --wpimg 传不进来（实测 renderer 侧恒为空）。更硬的一条约束是**冒号**：
+   把 `file:///...` 或 `C:\...` 这类含 `:` 的值当作 electron.exe 的命令行参数，进程会在 main 之前
+   直接死掉（exit=-1、日志 0 行）。所以路径按 UTF-8 字节转成纯十六进制传进来，renderer 侧还原。
+   hide 正是「临时隐藏指定层」这个**纯取证用**参数，生产路径永不出现 ⇒ 借它当通道，一行 main.js 都不用改。
+   取值形如 `hide=hex=<十六进制字节>`；还原后只接受「盘符:\ 或 \\ 开头」的本机路径 ——
+   绝不接受 http(s)/远程，避免把页面变成任意外链加载器。 */
+var __WP = (function () {
+  var h = String(Q.get('hide') || '')
+  if (h.indexOf('hex=') !== 0) return ''
+  var hex = h.slice(4).replace(/[^0-9a-fA-F]/g, '')
+  if (!hex.length || hex.length % 2 || !/^[0-9a-fA-F]+$/.test(hex)) return ''
+  var s = ''
+  for (var i = 0; i < hex.length; i += 2) s += '%' + hex.substr(i, 2)
+  try { return decodeURIComponent(s) } catch (e) { return '' }
+})()
+if (/^[A-Za-z]:[\\/]/.test(__WP) || __WP.indexOf('\\\\') === 0) {
+  document.body.style.backgroundImage = 'url("file:///' + __WP.replace(/\\/g, '/').replace(/"/g, '%22') + '")'
+  document.body.style.backgroundSize = 'cover'
+  document.body.style.backgroundPosition = 'center'
+  window.__wpApplied = __WP
+}
+applyMetrics({ svgSize: Number(Q.get('svg') || 144), pad: Number(Q.get('pad') || 18),
+               opacity: Number(Q.get('opacity') || 100) })
+applyState((Q.get('state') || 'IDLE').toUpperCase(), null)
+try { logMotion() } catch (e) { BRIDGE.log('logMotion ERR: ' + (e && e.message ? e.message : String(e))) }   /* 车道表留痕（机器可读） */
+BRIDGE.log('renderer ready states=' + STATES.length + ' freeze=' + FREEZE)
+</script>
+
+<script>
+/* ======================================================================
+   v2 数据层消费（**独立 onMessage 监听器**，不改动原有分发链）
+   纪律：applicable!==true → 不画条；subagents 缺失 → 不显示 0/0；
+        子代理节点**不画百分比**（协议里没有）；planChange → 条旁写明原因。
+   进度图形抽成 PROGRESS_GLYPH 一处 —— 换形态只改它。
+   ====================================================================== */
+var V2 = { caps: {}, progress: null, subagents: null, sessions: null, metrics: null, row: null, any: false, panelOpen: false, hot: false, sig: '', rowsSig: '',
+  todos: null, cost: null, context: null, tokens: null, text: null, textRev: -1, textDegraded: null }
+var V2DETAIL = 'tree', V2PLATE = 'on', V2ROWS = 'off', V2BAR = 'off', V2PROFILE = 'standard', V2ALPHA = 0.78
+/* ---------- 窗口侧主题（可调量）—— 任务 F ----------
+   真源在主进程（`~/.dsh/work-icon/theme.json`）；渲染层只是把它写成 CSS 变量。
+   **默认值 = 用户当前形态**：悬浮板底色 α=0（全删）、大面板 α=null（跟随宿主 cfg.panelAlpha，即 0.78）、
+   其余三档为 1（不改）。`THEME.panelAlpha === null` 表示"没在设置窗口里调过 ⇒ 大面板 α 仍听宿主的"。 */
+var THEME = { hoverPlateAlpha: 0, panelAlpha: null, textBoost: 1, panelOpacity: 1, iconBright: 1 }
+var HOVER_NOBG_MAX = 0.35   /* 悬浮板 α ≤ 此值 ⇒ 视为"没有底"，挂文字补偿（描边） */
+function v2ApplyTheme (t) {
+  if (!t || typeof t !== 'object') return
+  if (typeof t.hoverPlateAlpha === 'number') THEME.hoverPlateAlpha = t.hoverPlateAlpha
+  if (t.panelAlpha === null) THEME.panelAlpha = null
+  else if (typeof t.panelAlpha === 'number') THEME.panelAlpha = t.panelAlpha
+  if (typeof t.textBoost === 'number') THEME.textBoost = t.textBoost
+  if (typeof t.panelOpacity === 'number') THEME.panelOpacity = t.panelOpacity
+  if (typeof t.iconBright === 'number') THEME.iconBright = t.iconBright
+  var b = document.body
+  b.style.setProperty('--hover-plate-a', String(THEME.hoverPlateAlpha))
+  b.style.setProperty('--text-boost', String(THEME.textBoost))
+  b.style.setProperty('--panel-opacity', String(THEME.panelOpacity))
+  b.style.setProperty('--icon-bright', String(THEME.iconBright))
+  /* 大面板底色：调过（number）就覆盖宿主的 cfg.panelAlpha；没调过（null）就把变量还原给宿主那一份 */
+  var pl = document.getElementById('plate')
+  if (pl) {
+    if (THEME.panelAlpha === null) pl.style.removeProperty('--panel-alpha')
+    else pl.style.setProperty('--panel-alpha', String(THEME.panelAlpha))
+  }
+  /* tuned 只在**真的偏离默认**时挂：默认路径的 DOM/合成结果一个字节不变（黄金样本与取色口径都吃这条） */
+  var tuned = THEME.textBoost !== 1 || THEME.iconBright !== 1 || THEME.panelOpacity !== 1 || THEME.panelAlpha !== null
+  b.classList.toggle('tuned', tuned)
+  var hv = document.getElementById('v2hover')
+  var nobg = THEME.hoverPlateAlpha <= HOVER_NOBG_MAX
+  if (hv) { hv.classList.toggle('hp-nobg', nobg); hv.style.setProperty('--hover-plate-a', String(THEME.hoverPlateAlpha)) }
+  var eff = v2EffectiveHoverPlate()
+  BRIDGE.log('theme css: hoverPlateAlpha=' + THEME.hoverPlateAlpha + ' effHoverA=' + eff.toFixed(3) +
+    ' nobg=' + nobg + ' panelAlpha=' + (THEME.panelAlpha === null ? 'null(跟随宿主)' : THEME.panelAlpha) +
+    ' textBoost=' + THEME.textBoost + ' panelOpacity=' + THEME.panelOpacity + ' iconBright=' + THEME.iconBright + ' tuned=' + tuned)
+  return { tuned: tuned, nobg: nobg, effHoverA: eff }
+}
+/* 当前**生效**的悬浮板 α：hoverPlate=off 时恒为 0（那条老开关语义不变） */
+function v2EffectiveHoverPlate () { return V2PLATE === 'off' ? 0 : THEME.hoverPlateAlpha }
+window.__themeState = function () {
+  return { hoverPlateAlpha: THEME.hoverPlateAlpha, effectiveHoverPlateAlpha: v2EffectiveHoverPlate(),
+    panelAlpha: THEME.panelAlpha, textBoost: THEME.textBoost, panelOpacity: THEME.panelOpacity,
+    iconBright: THEME.iconBright, hoverPlate: V2PLATE, tuned: document.body.classList.contains('tuned'),
+    nobg: !!document.getElementById('v2hover') && document.getElementById('v2hover').classList.contains('hp-nobg') }
+}
+
+/* ---------- 可替换的进度图形（占位＝orbital 手法；换形态只改这一个对象） ---------- */
+var PROGRESS_GLYPH = {
+  name: 'orbital（占位）',
+  /* o = { p:0..1, size:px, state:'advance'|'complete'|'rest', mini:bool } */
+  render: function (o) {
+    var s = o.size, cx = s / 2, R = s / 2 - s * 0.04, c = 2 * Math.PI * R, N = 12, i, seg = ''
+    for (i = 0; i < N; i++) {
+      seg += '<circle class="seg" data-i="' + i + '" cx="' + cx + '" cy="' + cx + '" r="' + R + '" fill="none" stroke="#56d9c8"' +
+        ' stroke-width="' + (s / 46 * 2.6).toFixed(2) + '" stroke-dasharray="' + (c / N * 0.62).toFixed(1) + ' ' + c.toFixed(1) + '"' +
+        ' stroke-dashoffset="' + (-c / N * i + c / 4).toFixed(1) + '" transform="rotate(-90 ' + cx + ' ' + cx + ')" opacity="0.12"/>'
+    }
+    return '<svg class="pglyph" width="' + s + '" height="' + s + '" viewBox="0 0 ' + s + ' ' + s + '">' +
+      '<circle cx="' + cx + '" cy="' + cx + '" r="' + (R * 1.06) + '" fill="none" stroke="#92aac0" stroke-opacity=".2" stroke-width="1" stroke-dasharray="1.5 ' + (s / 46 * 4).toFixed(1) + '"/>' +
+      seg +
+      '<g class="v2spin anim" style="transform-origin:' + cx + 'px ' + cx + 'px">' +
+        '<circle cx="' + cx + '" cy="' + (cx - R) + '" r="' + (s / 46 * 2.4).toFixed(2) + '" fill="#e8f0fa"/></g>' +
+      '<path class="doneMark" d="M' + (cx - R * 0.36) + ' ' + cx + ' L' + (cx - R * 0.06) + ' ' + (cx + R * 0.3) + ' L' + (cx + R * 0.4) + ' ' + (cx - R * 0.3) + '" fill="none" stroke="#7fe3c8" stroke-width="' + (s / 46 * 3).toFixed(2) + '" stroke-linecap="round" stroke-linejoin="round" opacity="0"/>' +
+      '</svg>'
+  },
+  update: function (el, o) {
+    if (!el) return
+    var segs = el.querySelectorAll('.seg'), lit = Math.round(o.p * segs.length), i
+    for (i = 0; i < segs.length; i++) {
+      segs[i].setAttribute('opacity', i < lit ? '0.95' : '0.12')
+      /* 三档：流畅档让"当前段"有扫描感（只改 background-position 走合成员） */
+      segs[i].classList.toggle('v2scan', V2PROFILE === 'smooth' && i === lit)
+    }
+    var dm = el.querySelector('.doneMark'); if (dm) dm.setAttribute('opacity', o.state === 'complete' ? '1' : '0')
+    var rn = el.querySelector('.v2spin'); if (rn) rn.style.opacity = o.state === 'complete' ? '0' : '1'
+  }
+}
+
+/* ---------- 数据纪律 ---------- */
+function v2ProgressText (pr) {
+  if (!pr) return { ok: false, txt: '计划 <span class="na">——</span>' }
+  if (pr.applicable !== true) return { ok: false, txt: '计划 <span class="na">——（本宿主不适用）</span>' }
+  var d = (typeof pr.done === 'number') ? pr.done : null
+  var t = (typeof pr.total === 'number') ? pr.total : null
+  if (d === null || t === null) return { ok: false, txt: '计划 <span class="na">——</span>' }   /* 不造 done/total */
+  return { ok: true, p: t > 0 ? d / t : 0, txt: '计划 <b>' + d + '/' + t + '</b>' }
+}
+function v2PlanNote (pr) {
+  if (!pr || !pr.planChange || typeof pr.planChange !== 'object') return ''
+  var f = pr.planChange.from, t = pr.planChange.to
+  if (typeof f !== 'number' || typeof t !== 'number') return ''
+  return '▲ 计划 ' + f + '→' + t                          /* 精简：保信息、少 4 字，避免折行 */                              /* 倒退必须带说明 */
+}
+function v2SubLine (sa) {
+  if (!sa || typeof sa.total !== 'number') return '子代理 <span class="na">——</span>'   /* 缺失不显示 0/0 */
+  var parts = ['主']
+  if (typeof sa.running === 'number' && sa.running > 0) parts.push(sa.running + ' 跑')
+  parts.push('共 ' + sa.total)
+  return '进程 ' + parts.join(' · ')
+}
+function v2Dur (it) {
+  var a = it.startedAt, b = it.endedAt, ms
+  if (typeof a !== 'number') return ''
+  ms = (typeof b === 'number' ? b : Date.now()) - a
+  if (ms < 0) ms = 0
+  return (ms < 60000 ? Math.round(ms / 1000) + 's' : Math.floor(ms / 60000) + 'm' + Math.round((ms % 60000) / 1000) + 's')
+}
+/* ---------- 悬浮层（HUD） ---------- */
+/* 进度环：**只吃真实协议数据**。
+   数据源优先"全部对话的总进度"（sessions.items[].progress 的均值），否则用宿主 progress.done/total。
+   规则：没有计划 ⇒ **不画环**（不画 0%、不画"不适用"）。 */
+/* 完成相位（要求 7：收束 → 再爆散一下）。
+   **一次性**：只在"进入完成态"时跑一次，用 setTimeout 切类；**不用 @keyframes**（既有纪律）；
+   省电档（eco）**完全静止** ⇒ 直接跳过，只把环设为终值。 */
+function v2Burst () {
+  var ico = document.getElementById('ico')
+  if (!ico) return
+  /* 省电档口径（用户定）：**空闲时**完全静止；完成那一刻仍保留这一次性爆散（约 1s） */
+  if (V2.skipBurst) { BRIDGE.log('burst: 跳过（状态采样截图）'); return }
+  ico.classList.remove('burst-tight', 'burst-out')
+  ico.classList.add('burst-tight')                 /* 0~38%：收束 */
+  BRIDGE.log('burst: 收束')
+  setTimeout(function () {
+    ico.classList.remove('burst-tight'); ico.classList.add('burst-out')   /* 38~100%：爆散 */
+    BRIDGE.log('burst: 爆散')
+  }, 380)
+  setTimeout(function () {
+    ico.classList.remove('burst-tight', 'burst-out')                      /* 回归静止 */
+    BRIDGE.log('burst: 回归')
+  }, 980)
+}
+function v2UpdateRing () {
+  var els = progRings()          /* 被渲染的那 7 个克隆（**不是** defs 里的母本） */
+  if (!els.length) return
+  var ei
+  var C = 2 * Math.PI * 88
+  var p = null, src = 'none'
+  var items = (V2.sessions && Array.isArray(V2.sessions.items))
+    ? V2.sessions.items.filter(function (s) { return typeof s.progress === 'number' }) : []
+  if (items.length >= 2) {   /* 规则3：**多个**对话时才取总进度；单对话用计划进度 */
+    p = items.reduce(function (a, s) { return a + s.progress }, 0) / items.length
+    src = 'sessions×' + items.length + '（多对话总进度）'
+  } else if (V2.progress && V2.progress.applicable === true && typeof V2.progress.total === 'number' && V2.progress.total > 0) {
+    p = V2.progress.done / V2.progress.total
+    src = 'progress ' + V2.progress.done + '/' + V2.progress.total
+  }
+  if (p === null) {
+    for (ei = 0; ei < els.length; ei++) {
+      els[ei].setAttribute('opacity', '0')
+      els[ei].setAttribute('stroke-dasharray', '0 ' + C.toFixed(1))
+    }
+    BRIDGE.log('ring: none（没有计划 ⇒ 不画环）n=' + els.length)
+    return
+  }
+  p = Math.max(0, Math.min(1, p))
+  var dash = (C * p).toFixed(1) + ' ' + C.toFixed(1)
+  for (ei = 0; ei < els.length; ei++) {
+    els[ei].setAttribute('opacity', '0.95')
+    els[ei].setAttribute('stroke-dasharray', dash)
+  }
+  BRIDGE.log('ring: p=' + (p * 100).toFixed(1) + '% src=' + src + ' dash=' + (C * p).toFixed(1) + ' n=' + els.length)
+}
+function v2RenderHover () {
+  var host = document.getElementById('v2hover')
+  if (!host) return
+  /* 老宿主：一个 v2 对象都没收到 ⇒ v2 悬浮层完全不显示（v1 外观零变化） */
+  if (!(V2.progress || V2.subagents || V2.sessions || V2.metrics)) { host.style.display = 'none'; return }
+  host.style.display = 'block'
+  host.className = (V2PLATE === 'off' ? 'noplate' : 'plate') + (v2EffectiveHoverPlate() <= HOVER_NOBG_MAX ? ' hp-nobg' : '')
+  host.style.setProperty('--hover-plate-a', String(v2EffectiveHoverPlate()))
+  /* ===== 任务 B（2026-09-20）：**三行文字删掉，图形留下** =====
+     用户原话：「就是左上角这个字我都不希望留，太碍眼了」（指这块悬浮信息板上的三行字）。
+     被删的**文字**：`.st` 的文本（THINKING · commanding）/ `.bl` 的文本（计划 ——（本宿主不适用））/
+                    `.h3` 的正文（进程 主 · 1 跑 · 共 1）。
+     当时被保留的三个图形（用户当时选的是"全留"）：
+       · `.r1 > .dot`        行首小圆点            —— 保留
+       · `.v2bullet > .bs`   150px 计划进度条      —— ⚠️ **任务 C 已去掉**（见下），保留的是 `.v2bullet` 的
+                                                      文字形态 `.bl`；`hoverBar='on'` 可把整根条还原
+       · `.h3 > .warnv2`     「▲ 计划 6→11」       —— 保留（用户当初特意要的"进度倒退要说明"）
+     ⇒ 所以这里删的是**文本节点**，图形与它们的容器节点原样留着。
+     可回退：window.hoverRows='on' 时三行文字原样回来（默认 'off' = 删掉；用户会改主意）。
+     判据见 tests/hover-rows.mjs（两个方向都跑真实进程：默认=都不在，on=都回来）。 */
+  /* ===== 任务 C（2026-09-21）：**那根 150px 横向计划进度条去掉** =====
+     用户原话（附截图）：「我这个左上角的任务条也不要了，有环形的这样是多此一举」——
+     图标本体的圆环已经在显示进度（青色弧），上面再压一根横条是重复。
+     ★ 只去掉**这一根横条**（`.v2bullet > .bs`）：
+        · 环形的进度弧**保留**（那是他认可的东西，也正是"多此一举"的对照物）；
+        · `#lab` / `#lab2` 两行青色中文**保留**（独立 div，不在这块悬浮层里，本轮一字未动）；
+        · `.r1 > .dot` 与 `.h3 > .warnv2`（「▲ 计划 6→11」）**照旧保留** —— 用户没点名它们。
+     ★ 两个开关**互不覆盖**：V2ROWS 管那三行**文字**，V2BAR 管这一根**条**。
+       V2BAR='on' 时整根原样还原（就等于本轮改动之前那一版的行为）。
+     可回退：window.hoverBar（'off' = 默认，去掉；'on' = 原样回来）。 */
+  var rows = (V2ROWS === 'on')
+  var bar = (V2BAR === 'on')
+  var pr = V2.progress, pt = v2ProgressText(pr), bl = ''
+  if (pt.ok && (rows || bar)) {
+    /* `.bs` 只在 bar 开时画；`.bl`（「计划 4/6 · 67%」那行**文字**）只在 rows 开时画。
+       没有 `.bs` 时把 `.bl` 改成左对齐（`right:0` 是给它让位给条用的，条没了就不必缩到右边）。 */
+    bl = '<span class="v2bullet">' +
+      (bar ? '<i class="bs" style="width:150px;transform:scaleX(' + pt.p.toFixed(3) + ')"></i>' : '') +
+      (rows ? '<b class="bl"' + (bar ? '' : ' style="right:auto;left:0"') + '>' + pt.txt + (pt.p < 1 ? ' · ' + Math.round(pt.p * 100) + '%' : '') + '</b>' : '') +
+      '</span>'
+  } else if (rows) {
+    /* 比例不可用（applicable=false）时的**文字**形态：与 bar 无关，跟随 rows。 */
+    bl = '<span class="v2bullet"><i class="bl" style="right:auto;left:0">' + pt.txt + '</b></i></span>'
+  }
+  /* 代理指标（轮数 · 工具数）**不在这里画**了：2026-09-19 用户拍板把它搬到 `#lab` 的正下方
+     （图标下面那行青色文字下面），样式沿用 `#lab`；这里是**搬走**不是复制 ⇒ 悬浮层里连节点都不留。
+     口径不变：代理指标没有分母，永远不许画成条/百分比（有分母的计划进度仍由 .v2bullet 表达，
+     但它按任务 C 默认不画，见上面的 V2BAR）。 */
+  host.innerHTML =
+    '<span class="r1"><i class="dot"></i>' + (rows ? '<b class="st">' + (V2.stateName || '—') + (V2.activity ? ' · ' + V2.activity : '') + '</b>' : '') + '</span>' +
+    bl +
+    '<span class="h3">' + (rows ? v2SubLine(V2.subagents) : '') +
+      (v2PlanNote(pr) ? (rows ? '　' : '') + '<span class="warnv2" style="white-space:nowrap">' + v2PlanNote(pr) + '</span>' : '') + '</span>'
+  v2LogHoverInv()
+  v2LogHoverRows()
+}
+/* 悬浮层形态留痕（tests/hover-metrics-row.mjs 吃它）。**口径已随 D 改动**（2026-09-19）：
+   代理指标行已搬到 `#lab` 下方，所以这里不再报「活动行 → 指标行的间距/样式」，
+   改成只报：① 尺子还在不在（名字 + 与类名无关的形状）；② **悬浮层里还有没有代理指标行**
+   （`tok2` 计数，判"是搬走不是复制"）；③ 悬浮层自己的文本（判它没把别的内容一并删掉）。 */
+function v2LogHoverInv () {
+  try {
+    var host = document.getElementById('v2hover')
+    if (!host) return
+    var worst = 0
+    var all = host.querySelectorAll('*')
+    for (var i = 0; i < all.length; i++) {
+      var n = 0, kids = all[i].children
+      for (var k = 0; k < kids.length; k++) {
+        var w = kids[k].getBoundingClientRect().width
+        if (window.getComputedStyle(kids[k]).position === 'absolute' && w > 0 && w <= 2) n++
+      }
+      if (n > worst) worst = n
+    }
+    var txt = (host.textContent || '').replace(/\s+/g, ' ').trim()
+    BRIDGE.log('hover inv: ' + JSON.stringify({
+      ruler: host.querySelectorAll('.v2ruler').length,
+      ticks: host.querySelectorAll('.v2ruler i').length,
+      tickbox: worst,
+      bullet: host.querySelectorAll('.v2bullet').length,
+      tok2: host.querySelectorAll('.tok2').length,          /* 必须是 0：代理指标行已搬走 */
+      hasMetricsText: /(\d+)\s*轮\s*·\s*(\d+)\s*工具/.test(txt),   /* 悬浮层文本里也不许再有它 */
+      text: txt.slice(0, 120)
+    }))
+    v2LogHoverInk(host)
+  } catch (e) { BRIDGE.log('hover inv ERR: ' + (e && e.message ? e.message : String(e))) }
+}
+/* ===== 悬浮层每行文字的**取色清单**（任务 E 用）=====
+   为什么另开一条而不是复用 `panel blocks(hover)`：那条只收**叶子**文本块（有元素子节点的容器会被跳过），
+   而 `.bl`（计划那一行）内部套着 `<span class="na">` ⇒ 它**从来不在**那条清单里。
+   底被删掉之后，"文字自己在浅色壁纸上到底还有多少对比度"必须**逐行**量得出来，
+   所以这里直接把三行的矩形 + 名义色 + 描边/阴影 + 当前生效的悬浮板 α 打成一条机器可读留痕。
+   只读、只打日志，不改任何视觉。 */
+function v2LogHoverInk (host) {
+  try {
+    var rows = []
+    ;['.st', '.h3', '.bl'].forEach(function (sel) {
+      var el = host.querySelector(sel)
+      if (!el) return
+      var r = el.getBoundingClientRect()
+      var cs = window.getComputedStyle(el)
+      rows.push({ cls: sel, text: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40),
+        left: Math.round(r.left), top: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height),
+        color: cs.color, fontSize: parseFloat(cs.fontSize),
+        strokeW: cs.webkitTextStrokeWidth || cs['-webkit-text-stroke-width'] || '',
+        strokeC: cs.webkitTextStrokeColor || cs['-webkit-text-stroke-color'] || '',
+        shadow: cs.textShadow })
+    })
+    var hv = document.getElementById('v2hover')
+    var hvcs = hv ? window.getComputedStyle(hv) : null
+    BRIDGE.log('hover ink: ' + JSON.stringify({
+      effPlateA: v2EffectiveHoverPlate(),
+      cls: hv ? String(hv.className) : '',
+      plateBg: hvcs ? hvcs.backgroundColor : '',
+      plateBorderW: hvcs ? hvcs.borderTopWidth : '',
+      plateRadius: hvcs ? hvcs.borderTopLeftRadius : '',
+      rows: rows
+    }))
+  } catch (e) { BRIDGE.log('hover ink ERR: ' + (e && e.message ? e.message : String(e))) }
+}
+/* ===== 悬浮层「三行文字 vs 三个图形」的形态留痕（任务 B，tests/hover-rows.mjs 吃它）=====
+   为什么必须两边都报：任务 B 删的是**三行文字**（`.st`/`.bl`/`.h3` 的文本），
+   当时留的是**三个图形**（`.r1 > .dot` / `.v2bullet > .bs` / `.h3 > .warnv2`）——
+   ⚠️ 任务 C 之后 `.bs` 那根条**默认也不画了**（window.hoverBar='off'），
+   所以这里额外报 `hoverBar`，好让测试知道"这个 0 是**有意为之**，不是误删图形"。
+   只断言"文字没了"会放过"连同图形一起删掉"这种错改 —— 那是把用户要的东西删了两次。
+   全是**自有数据**（字符串/数字/计数），不含任何活对象。只读、只打日志，不改任何视觉。 */
+function v2LogHoverRows () {
+  try {
+    var host = document.getElementById('v2hover')
+    if (!host) return
+    BRIDGE.log('hover rows: ' + JSON.stringify({
+      hoverRows: V2ROWS,
+      hoverBar: V2BAR,
+      shown: host.style.display !== 'none',
+      r1: host.querySelectorAll('.r1').length,
+      dot: host.querySelectorAll('.r1 > .dot').length,
+      st: host.querySelectorAll('.st').length,
+      bl: host.querySelectorAll('.bl').length,
+      h3: host.querySelectorAll('.h3').length,
+      bullet: host.querySelectorAll('.v2bullet').length,
+      bs: host.querySelectorAll('.v2bullet > .bs').length,
+      warnv2: host.querySelectorAll('.warnv2').length,
+      h3warn: host.querySelectorAll('.h3 > .warnv2').length,
+      text: (host.textContent || '').replace(/\s+/g, ' ').trim()
+    }))
+  } catch (e) { BRIDGE.log('hover rows ERR: ' + (e && e.message ? e.message : String(e))) }
+}
+/* ---------- 面板：简单 / 分列 / 树 ---------- */
+function v2RenderPanel () {
+  var host = document.getElementById('v2panel')
+  if (!host) return
+  if (!V2.panelOpen) { host.style.display = 'none'; if (window.dsh && window.dsh.treeRows) window.dsh.treeRows([]); return }
+  /* 零数据守卫：宿主一个 v2 字段都没给 ⇒ v2 面板完全不显示。
+     否则它会画占位行（树根/会话/子代理）**叠在样板的空状态上** —— 文字互相压住 + 下半部一片空网格。 */
+  if (!V2.any) { host.style.display = 'none'; if (window.dsh && window.dsh.treeRows) window.dsh.treeRows([]); return }   /* 零数据守卫 */
+  host.style.display = 'block'
+  var sa = V2.subagents, pr = V2.progress, pt = v2ProgressText(pr), html = ''
+  html += '<div class="ph2">会话 · ' + (V2.sessions && V2.sessions.total ? V2.sessions.total : '—') +
+    '<span class="he">' + pt.txt + '</span></div>'
+  if (V2DETAIL === 'simple') {
+    html += '<div class="srow">' + (sa && typeof sa.total === 'number' ? '子代理 ' + (sa.done || 0) + '/' + sa.total : '子代理 <span class="na">无</span>') +
+      '<span class="agg">' + (v2PlanNote(pr) ? '<span class="warnv2">' + v2PlanNote(pr) + '</span>' : '') + '</span></div>'
+  } else if (V2DETAIL === 'columns') {
+    if (V2.sessions && V2.sessions.items && V2.sessions.items.length) {
+      html += '<div class="sess">'
+      V2.sessions.items.slice(0, 6).forEach(function (s, i) {
+        html += '<div style="display:inline-block;width:16.6%;text-align:center;vertical-align:top">' +
+          PROGRESS_GLYPH.render({ size: 44, p: (typeof s.progress === 'number' ? s.progress : 0), state: 'advance', mini: true }) +
+          '<div style="font-size:9px;color:var(--ink);white-space:nowrap;overflow:hidden">' + (s.title || s.label || s.id || ('会话 ' + (i + 1))) + '</div></div>'
+      })
+      html += '</div>'
+    } else html += '<div class="srow">会话 <span class="na">——</span></div>'
+  } else {
+    /* 树：**根 = 主代理节点**，子代理挂在它下面（缩进 + ├└│ + 状态图标 + 时长·工具数） */
+    var items = (sa && sa.items) ? sa.items.slice() : []
+    var rows = [{ id: 'root', d: 0, label: '主代理', st: 'run', tail: (V2.metrics && V2.metrics.elapsedMs ? Math.round(V2.metrics.elapsedMs / 1000) + 's' : '') + (V2.metrics && V2.metrics.toolCalls ? ' · ' + V2.metrics.toolCalls + ' 工具' : '') }]
+    if (sa && typeof sa.total === 'number') {
+      var shown = 0, MAXROW = 8
+      items.sort(function (a, b) { return (a.status === 'running' ? 0 : a.status === 'done' ? 2 : 1) - (b.status === 'running' ? 0 : b.status === 'done' ? 2 : 1) })
+      items.forEach(function (it) {
+        var d = (typeof it.depth === 'number' ? it.depth : 1)
+        if (d > 2 + (V2.row ? 0 : 0)) return
+        if (rows.length >= MAXROW) return
+        rows.push({ id: 'n' + shown, d: d, label: it.label || '(未命名)', st: it.status || 'unknown', tail: v2Dur(it) + (typeof it.toolCalls === 'number' ? ' · ' + it.toolCalls + ' 工具' : ''), raw: it })
+        shown++
+      })
+      var hidden = Math.max(0, (sa && sa.total ? sa.total : 0) - shown)
+      if (hidden > 0) rows.push({ id: 'fold', d: 1, label: '（还有 ' + hidden + ' 个子代理）', st: 'fold', tail: '+' + hidden })
+    }
+    html += '<div class="tree2">'
+    rows.forEach(function (r, i) {
+      var isLast = i === rows.length - 1 || (rows[i + 1] && rows[i + 1].d < r.d)
+      var pref = r.d === 0 ? '' : (r.d === 1 ? (isLast ? '└ ' : '├ ') : (isLast ? '│  └ ' : '│  ├ '))
+      var arrow = r.d === 0 ? '' : (r.st === 'fold' ? '' : (r.id === V2.row ? '▾' : '▸'))
+      html += '<div class="trow ' + (r.d === 0 ? 'root' : '') + (r.id === V2.row ? ' hot' : '') + (r.st === 'fold' ? ' fold' : '') + '" data-rowid="' + r.id + '">' +
+        '<span class="tw">' + pref + '</span><span class="ar">' + arrow + '</span>' +
+        '<span class="ln">' + r.label + '</span>' +
+        '<span class="tail">' + r.tail + '</span>' +
+        (r.st === 'fold' ? '' : '<i class="ic ' + (r.st === 'running' ? 'run' : r.st) + '"></i>') + '</div>'
+    })
+    html += '</div>'
+    try { html += v2RenderTodos() + v2RenderCost() + v2RenderContext() + v2RenderText() }
+    catch (e) { BRIDGE.log('v2 sec ERR: ' + (e && e.message ? e.message : String(e))) }
+  }
+  host.innerHTML = html
+  try { renderPanel() } catch (e) { BRIDGE.log('renderPanel ERR: ' + (e && e.message ? e.message : String(e))) }
+  try { v2PlaceUnderPlate() } catch (e4) { BRIDGE.log('v2PlaceUnderPlate ERR: ' + e4.message) }
+  try { logPanelText('after-v2')
+  try { logPanelLayout('after-v2') } catch (e3) { BRIDGE.log('logPanelLayout ERR: ' + e3.message) } } catch (e2) { BRIDGE.log('logPanelText ERR: ' + e2.message) }   /* 样板区与 v2 同源；异常不再静默 */
+  v2ReportRows()
+}
+/* 把"树的行带"报给主进程（窗口内 CSS px）→ 主进程 40ms 轮询做行命中 */
+function v2ReportRows () {
+  var host = document.getElementById('v2panel')
+  if (!window.dsh || !window.dsh.treeRows || !host || !V2.panelOpen || V2DETAIL !== 'tree') {
+    if (window.dsh && window.dsh.treeRows && V2.rowsSig !== 'closed') { V2.rowsSig = 'closed'; window.dsh.treeRows([]) }
+    return
+  }
+  var els0 = host.querySelectorAll('.trow')
+  var rsig = V2.panelOpen ? (els0.length + ':' + [].map.call(els0, function (e) { return e.getAttribute('data-rowid') }).join(',')) : 'closed'
+  if (rsig === V2.rowsSig) return
+  V2.rowsSig = rsig
+  BRIDGE.log('v2 reportRows detail=' + V2DETAIL + ' disp=' + host.style.display + ' rows=' + els0.length + ' bridge=' + !!(window.dsh && window.dsh.treeRows))
+  var base = host.getBoundingClientRect(), rows = [], els = els0
+  for (var i = 0; i < els.length; i++) {
+    var r = els[i].getBoundingClientRect()
+    rows.push({ id: els[i].getAttribute('data-rowid'), y0: Math.round(r.top + 0), y1: Math.round(r.bottom) })
+  }
+  window.dsh.treeRows(rows)
+}
+/* ---------- 四字段渲染（数据纪律：applicable!==true ⇒ 不画；"没有数据"≠"0"） ---------- */
+function money (c) { return (typeof c === 'number' && isFinite(c)) ? ('¥' + c.toFixed(2)) : null }
+function sec (tag, s) { BRIDGE.log('v2 sec ' + tag + ' :: ' + String(s).replace(/<[^>]*>/g, '|').replace(/\s+/g, ' ').slice(0, 220)) }
+/* ---------- 四字段渲染（数据纪律：applicable!==true ⇒ 不画；"没有数据"≠"0"） ---------- */
+function money (c) { return (typeof c === 'number' && isFinite(c)) ? ('¥' + c.toFixed(2)) : null }
+function v2RenderTodos () {
+  var td = V2.todos, s = ''
+  /* ④ 缺数据 ≠ 不渲染：先给任务块一个明确空态，下面 if 有 todos 时会整体覆盖。
+     （空态 ≠ 假数据：显示"空"对，显示 0/0 或编数字错。） */
+  s = '<div class="v2sec"><div class="sh">任务</div><div class="mt na">任务列表为空</div></div>'
+  if (td && typeof td === 'object' && Array.isArray(td.items)) {      /* 信封：只认 {items,more}，不当裸数组 */
+    if (!td.items.length) {
+      s = '<div class="v2sec"><div class="sh">任务</div><div class="mt na">任务列表为空</div></div>'    /* 空 ≠ 没有数据 */
+    } else {
+      var rows = td.items.slice(0, 5).map(function (it) {
+        var d = (typeof it.depth === 'number' ? it.depth : 0)
+        var mark = it.status === 'done' ? '✓' : it.status === 'in_progress' ? '●' : '○'
+        var cls = it.status === 'done' ? 'done' : it.status === 'in_progress' ? 'run' : 'wait'
+        /* ★ 2026-09-13：任务正文原来是一段**裸文本节点**，不在任何可测元素里 ——
+           对比度探针（__PROBE_SEL / PANEL_SEL 都只认 .trow2 .tt）与 §⑨ 因此**从来没有量过这一行**，
+           这就是"下半截发灰"能一路全绿的原因之一。包一层 <span class="tt"> 后它成为可测叶子。
+           布局中性：.tt 全局只有 color:var(--ink)（与继承值逐字节相同），display 仍是 inline，不进盒子。 */
+        return '<div class="trow2 d' + d + '"><span class="tw">' + (d ? '└ ' : '') + '</span>' +
+          '<span class="mk ' + cls + '">' + mark + '</span><span class="tt">' + (it.content || '') + '</span></div>'
+      }).join('')
+      var more = (typeof td.more === 'number' && td.more > 0) ? '<div class="fold">（还有 ' + td.more + ' 项）+更多 ' + td.more + '</div>' : ''
+      s = '<div class="v2sec"><div class="sh">任务 · ' + td.items.length + (td.more ? '+' + td.more : '') + '</div>' + rows + more + '</div>'
+    }
+  }
+  sec('todos', s)
+  return s
+}
+function v2RenderCost () {
+  var c = V2.cost, s = ''
+  /* 宿主没下发 cost（未声明能力 / 老宿主）⇒ 什么都不画。「没送来」≠「不可用」。 */
+  if (c === null || c === undefined) { sec('cost', ''); return '' }
+  if (!c || typeof c !== 'object' || c.status !== 'ok') {
+    s = '<div class="v2sec"><div class="sh">花费</div><div class="mt na">账单不可用</div></div>'   /* 拿不到账本：明确不可用，绝不显示 ¥0.00 */
+  } else {
+    var v = c.cost && money(c.cost.CNY)
+    s = (v === null)
+      ? '<div class="v2sec"><div class="sh">花费</div><div class="mt na">账单不可用</div></div>'    /* status=ok 但没有金额 ⇒ 仍不可用 */
+      : '<div class="v2sec"><div class="sh">花费</div><div class="mt">' + v +
+        ((typeof c.unpriced === 'number' && c.unpriced > 0) ? '　<span class="na">' + c.unpriced + ' 项未计价</span>' : '') + '</div></div>'
+  }
+  sec('cost', s)
+  return s
+}
+function v2RenderContext () {
+  var x = V2.context, s = ''
+  if (x && typeof x === 'object') {
+    if (x.applicable !== true) s = '<div class="v2sec"><div class="sh">上下文占用</div><div class="mt na">不适用</div></div>'   /* applicable!==true ⇒ 不画环 */
+    else {
+      var ratio = (typeof x.ratio === 'number') ? x.ratio : (x.limit > 0 ? x.used / x.limit : null)   /* 宿主算好的直接用，不再乘 */
+      if (ratio === null) s = '<div class="v2sec"><div class="sh">上下文占用</div><div class="mt na">——</div></div>'
+      else {
+        var pct = Math.max(0, Math.min(1, ratio)), r = 11, c2 = 2 * Math.PI * r
+        s = '<div class="v2sec"><div class="sh">上下文占用 · ' + (typeof x.used === 'number' ? x.used : '?') + '/' + (typeof x.limit === 'number' ? x.limit : '?') + '</div>' +
+          '<div class="mt"><svg width="26" height="26" viewBox="0 0 26 26" style="vertical-align:middle">' +
+          '<circle cx="13" cy="13" r="11" fill="none" stroke="#92aac0" stroke-opacity=".25" stroke-width="3"/>' +
+          '<circle cx="13" cy="13" r="11" fill="none" stroke="#6fb6ff" stroke-width="3" stroke-linecap="round" stroke-dasharray="' + (c2 * pct).toFixed(1) + ' ' + c2.toFixed(1) + '" transform="rotate(-90 13 13)"/></svg>' +
+          ' <b>' + (ratio * 100).toFixed(1) + '%</b></div></div>'
+      }
+    }
+  }
+  sec('ctx', s)
+  return s
+}
+function v2RenderText () {
+  /* ⚠️ 2026-09-20：这一段原来在"没有文本"时**什么都不画** ⇒ "面板拿不到内容"和"没有内容"
+     长得一模一样（用户投诉「思考文本一直拿不到内容」却看不出来）。纪律：没有输出必须能和
+     出故障区分开 ⇒ 三种情形各有明确文案：有内容 / 等待数据（合法空载荷）/ 不可用（降级+原因）。 */
+  var s2 = V2.text, s = ''
+  if (V2.textDegraded) {
+    s = '<div class="v2sec"><div class="sh">文本</div><div class="mt na">思考文本不可用（' + String(V2.textDegraded).slice(0, 60) + '）</div></div>'
+  } else if (s2) {
+    var out = ''
+    if (s2.activityText) out += '<div class="tx">' + String(s2.activityText).slice(0, 80) + '</div>'
+    if (s2.thoughtTail) out += '<div class="tx dim2">' + String(s2.thoughtTail).slice(0, 80) + '</div>'
+    if (s2.bodyTail) out += '<div class="tx">' + String(s2.bodyTail).slice(0, 80) + '</div>'
+    if (out) s = '<div class="v2sec"><div class="sh">文本 · 第 ' + V2.textRev + ' 次更新</div>' + out + '</div>'
+    else s = '<div class="v2sec"><div class="sh">文本 · 第 ' + V2.textRev + ' 次更新</div><div class="mt na">等待数据</div></div>'
+  }
+  sec('text', s)
+  return s
+}
+/* ---------- 消息接入（独立监听器） ---------- */
+function v2Consume (msg) {
+  if (!msg || !msg.kind) return
+  /* v2 字段**随 state 载荷**下发（宿主协议里没有独立 kind），收到什么渲染什么 */
+  if (msg.kind === 'state') {
+    /* 签名闸门：v2 关心的字段没变化 ⇒ 不重渲染、不打日志（避免每条消息都干活+刷日志） */
+    var sig = (msg.state || '') + '|' + (msg.activity || '') + '|' + ((msg.metrics && msg.metrics.toolCalls) || 0) +
+      '|' + JSON.stringify(msg.progress || null) + '|' + JSON.stringify(msg.metrics || null) +
+      '|' + JSON.stringify(msg.subagents ? (msg.subagents.total + ':' + (msg.subagents.items ? msg.subagents.items.length : 0) + ':' + msg.subagents.running) : null) +
+      '|' + JSON.stringify(msg.sessions ? (msg.sessions.total + ':' + (msg.sessions.hidden || 0)) : null) +
+      '|' + JSON.stringify(msg.todos ? ((msg.todos.items || []).length + ':' + (msg.todos.more || 0)) : null) +
+      '|' + JSON.stringify(msg.cost || null) + '|' + JSON.stringify(msg.context || null) + '|' + JSON.stringify(msg.tokens || null)
+    if (sig === V2.sig) return
+    V2.sig = sig
+    if (msg.progress !== undefined) { V2.caps.progress = true; V2.progress = msg.progress; V2.any = true }
+    if (msg.metrics !== undefined) { V2.caps.metrics = true; V2.metrics = msg.metrics; V2.any = true }
+    if (msg.subagents !== undefined) { V2.caps.subagents = true; V2.subagents = msg.subagents; V2.any = true }
+    /* 有界 dump：只打键名与名称类字段的值（判'子代理到底带不带名字'），绝不刷整个载荷 */
+    try { var _si = (msg.subagents && msg.subagents.items) || []; BRIDGE.log('subagents dump: ' + JSON.stringify(_si.slice(0, 3).map(function (it) { return { keys: Object.keys(it || {}), label: it && it.label, title: it && it.title, name: it && it.name, id: it && it.id } }))) } catch (e) { BRIDGE.log('subagents dump ERR: ' + e.message) }
+    if (msg.sessions !== undefined) { V2.caps.sessions = true; V2.sessions = msg.sessions; V2.any = true }
+      v2UpdateRing()   /* 同步进度环（真数据）*/
+    if (msg.todos !== undefined) { V2.caps.todos = true; V2.todos = msg.todos; V2.any = true }
+    if (msg.cost !== undefined) { V2.caps.cost = true; V2.cost = msg.cost; V2.any = true }
+    if (msg.context !== undefined) { V2.caps.context = true; V2.context = msg.context; V2.any = true }
+    if (msg.tokens !== undefined) { V2.caps.tokens = true; V2.tokens = msg.tokens; V2.any = true }
+    if (typeof msg.state === 'string') V2.stateName = msg.state
+    /* 进入完成态 ⇒ 跑一次完成相位（同状态重复到来不重跑） */
+    if (msg.state === 'SUCCESS' && V2.lastState !== 'SUCCESS') { V2.lastState = 'SUCCESS'; v2Burst() }
+    else if (msg.state && msg.state !== 'SUCCESS') V2.lastState = msg.state
+    if (typeof msg.activity === 'string') V2.activity = msg.activity
+    BRIDGE.log('v2(state) progress=' + (msg.progress ? JSON.stringify(msg.progress) : 'none') +
+      ' subitems=' + ((msg.subagents && msg.subagents.items) ? msg.subagents.items.length : 'none') +
+      ' sessions=' + ((msg.sessions && msg.sessions.total !== undefined) ? msg.sessions.total : 'none'))
+    /* 安静化：不在测试/常态下做多余渲染 —— 面板只在开着时渲染；悬浮层只在被悬停时渲染 */
+    if (V2.panelOpen) (function(){try{v2RenderPanel()}catch(e){BRIDGE.log('v2RP ERR: '+(e&&e.message?e.message:String(e)))}})()
+    if (V2.hot && !V2.panelOpen) { v2RenderHover(); v2LogRender() }
+  } else if (msg.kind === 'test-mode') {
+    /* 状态采样截图（test-mode 且没有 --shot-payload）⇒ 不跑完成相位，否则黄金样本非确定 */
+    if (msg.on && msg.shotPayload === false) { V2.skipBurst = true; BRIDGE.log('test-mode: 状态采样截图 ⇒ 跳过完成相位') }
+    /* 完成相位冻结（截图专用）：直接把类钉在某个相位，不跑定时序列 ⇒ 两个相位可分别抓图 */
+    if (msg.burst) {
+      /* 冻结通道：把 burstT 钉在某个相位（收紧=300ms / 爆散=700ms），由循环读取 ⇒ 两帧可比 */
+      V2.freezeBurst = (msg.burst === 'none') ? null : msg.burst
+      BRIDGE.log('burst: 冻结在 ' + msg.burst + '（循环读 V2.freezeBurst）')
+    }
+    /* 仅测试/截图模式启用：把渲染层异常变成日志（否则异常完全静默 —— 我们为此丢过一次函数） */
+    if (msg.on && !window.__dshErrHook) {
+      window.__dshErrHook = true
+      window.addEventListener('error', function (e) { BRIDGE.log('renderer error: ' + (e.message || 'unknown') + ' @' + (e.filename || '') + ':' + (e.lineno || 0)) })
+      window.addEventListener('unhandledrejection', function (e) { BRIDGE.log('renderer rejection: ' + ((e.reason && e.reason.message) || e.reason || 'unknown')) })
+      BRIDGE.log('renderer 错误通道已启用（测试模式）')
+    }
+  } else if (msg.kind === 'text') {
+    /* revision 单调递增：变化才重画（用它驱动"跳动"，不自己造时间戳）
+       ⚠️ 2026-09-20：degraded / 空载荷必须**看得见**（纪律：没有输出 ≠ 出故障）。
+       force=true 表示主进程没拿到合法 revision（降级路径）⇒ 也要重画，否则降级态根本画不出来。 */
+    if (msg.force === true || typeof msg.revision !== 'number' || msg.revision !== V2.textRev) {
+      V2.textRev = typeof msg.revision === 'number' ? msg.revision : V2.textRev
+      V2.text = { activityText: msg.activityText, thoughtTail: msg.thoughtTail, bodyTail: msg.bodyTail }
+      V2.textDegraded = msg.degraded || null
+      V2.caps.text = true; V2.any = true
+      BRIDGE.log('v2 text revision=' + V2.textRev + ' thought=' + String(msg.thoughtTail || '').slice(0, 24) + (msg.degraded ? ' degraded=' + msg.degraded : ''))
+      if (V2.panelOpen) (function(){try{v2RenderPanel()}catch(e){BRIDGE.log('v2RP ERR: '+(e&&e.message?e.message:String(e)))}})(); else if (V2.hot) { v2RenderHover(); v2LogRender() }
+    }
+  } else if (msg.kind === 'hover-rows') {
+    /* 任务 B（2026-09-20）：window.hoverRows 由主进程经**内部 IPC** 下发（与 kind:'fps'/'theme' 同族）。
+       ⚠️ 为什么不走现成的 `v2ApplyWindow(w)`：那个函数**从来没有被调用过**（死代码，实测确认），
+       把新键挂在它上面 = 写一个永远到不了渲染层的键（宿主的 hoverPlate 就是这么"到不了"的）。
+       这里用一条显式消息，能留痕、能被测试端到端验证。 */
+    V2ROWS = (msg.value === 'on') ? 'on' : 'off'
+    BRIDGE.log('hoverRows=' + V2ROWS)
+    if (V2.hot && !V2.panelOpen) { v2RenderHover(); v2LogRender() }
+  } else if (msg.kind === 'hover-bar') {
+    /* 任务 C（2026-09-21）：window.hoverBar 同样由主进程经内部 IPC 下发（与 hoverRows 同族）。
+       与 hoverRows 是**两个独立开关**：这一个只管那根 150px 横向计划进度条 `.v2bullet > .bs`。 */
+    V2BAR = (msg.value === 'on') ? 'on' : 'off'
+    BRIDGE.log('hoverBar=' + V2BAR)
+    if (V2.hot && !V2.panelOpen) { v2RenderHover(); v2LogRender() }
+  } else if (msg.kind === 'theme') {   /* 任务 F：设置窗口 → 主进程 → 这里（**同一个 Electron 实例的 IPC**，不经宿主 stdio） */
+    var tr = null
+    try { tr = v2ApplyTheme(msg.theme) } catch (e) { BRIDGE.log('theme apply ERR: ' + (e && e.message ? e.message : String(e))) }
+    BRIDGE.log('theme <- ' + JSON.stringify(msg.theme || null) + ' -> ' + JSON.stringify(tr))
+    v2RenderHover()      /* 补偿类/底变量的变化要立刻反映到悬浮层（它是热更新里最常被调的那一块） */
+    if (V2.hot && !V2.panelOpen) v2LogRender()
+    else { try { logPanelLayout('theme') } catch (e2) { BRIDGE.log('logPanelLayout(theme) ERR: ' + e2.message) } }
+  } else if (msg.kind === 'test-hover') {   /* 测试钩子：与 hot 同义，让测试能驱动被悬停 */
+    V2.hot = !!msg.on
+    if (V2.hot && !V2.panelOpen) { v2RenderHover(); v2LogRender() }
+  } else if (msg.kind === 'hot') {
+    V2.hot = !!msg.inside
+    if (V2.panelOpen) { /* 面板开着时不出轻量层（互斥） */ }
+    else if (V2.hot) { v2RenderHover(); v2LogRender() }
+    else { var h0 = document.getElementById('v2hover'); if (h0) h0.style.display = 'none' }   /* 移开即收起，零常驻 */
+  } else if (msg.kind === 'panel') { BRIDGE.log('v2 panel msg open=' + msg.open); V2.panelOpen = !!msg.open; if (V2.panelOpen) (function(){try{v2RenderPanel()}catch(e){BRIDGE.log('v2RP ERR: '+(e&&e.message?e.message:String(e)))}})(); else { V2.rowsSig = 'closed'; if (window.dsh && window.dsh.treeRows) window.dsh.treeRows([]); var h1 = document.getElementById('v2hover'); if (h1) h1.style.display = 'none' } }   /* 面板开合后重渲染 v2 面板（树行上报依赖它） */
+  else if (msg.kind === 'row') { V2.row = msg.id; BRIDGE.log('v2 row=' + msg.id); (function(){try{v2RenderPanel()}catch(e){BRIDGE.log('v2RP ERR: '+(e&&e.message?e.message:String(e)))}})() }
+}
+BRIDGE.onMessage(v2Consume)
+/* ★ 加载竞态兜底（2026-09-19 定位到的真 bug —— 不是本轮 D 引入的，只是被 D 的体量触发得更频繁）：
+   宿主在收到 ready 后**立刻**下发第一条 state，而两个 <script> 块是**同步**执行的 ——
+   若那条 state 在第二个块注册监听器之前就被分发掉，v2 层就一条都收不到：
+   `V2.any` 恒为 false ⇒ 面板永远走"零数据"分支（`panel layout(nodata)`），
+   几何/形态类断言全部落空（实测：v2.mjs ⑧ 的「面板形态：面板块出界」就是这样变红的）。
+   兜底：注册完监听器后，用**第一个块已经落地的那份 state**（`curPayload`）补一次消费。
+   幂等安全：v2Consume 开头就是签名闸门，同一条消息重复进来只会被跳过。 */
+try {
+  if (!V2.any && typeof curPayload !== 'undefined' && curPayload && curPayload.kind === 'state') {
+    v2Consume(curPayload)
+    BRIDGE.log('v2 replay: 用首个 state 补消费（加载竞态兜底）any=' + V2.any)
+  }
+} catch (e) { BRIDGE.log('v2 replay ERR: ' + (e && e.message ? e.message : String(e))) }
+/* 渲染结果留痕：退化时"显示的是什么"必须能被机器读到 */
+function v2LogRender () {
+  var hv = document.getElementById('v2hover')
+  var txt = hv ? hv.textContent.replace(/\s+/g, ' ').slice(0, 120) : 'none'
+  var vis = hv ? (getComputedStyle(hv).display !== 'none') : false
+  BRIDGE.log('v2 render hover=' + (vis ? 'on' : 'off') + ' text=[' + txt + ']')
+  try { logPanelLayout('hover') } catch (eh) { BRIDGE.log('logPanelLayout(hover) ERR: ' + eh.message) }
+}
+/* ---------- 三档剖面：eco 空闲完全静止 / standard 一枚元素慢呼吸 / smooth 持续流动 ---------- */
+function v2ApplyProfile (name) {
+  V2PROFILE = ['eco', 'standard', 'smooth'].indexOf(name) >= 0 ? name : 'standard'
+  document.body.classList.remove('tier-eco', 'tier-standard', 'tier-smooth')
+  document.body.classList.add('tier-' + V2PROFILE)
+  BRIDGE.log('profile=' + V2PROFILE)
+  try { if (typeof logMotion === 'function') logMotion() } catch (e) { BRIDGE.log('logMotion ERR: ' + e.message) }   /* 省电剖面 ⇒ per-lane 运动关闭，重新留痕 */
+}
+function v2ApplyWindow (w) {
+  if (!w) return
+  if (w.panelAlpha !== undefined) { V2ALPHA = w.panelAlpha; var pl = document.getElementById('plate')
+    /* 设置窗口调过大面板底色 ⇒ 窗口侧覆盖值优先（THEME.panelAlpha 是 number）；没调过就照旧吃宿主的值 */
+    if (pl && THEME.panelAlpha === null) pl.style.setProperty('--panel-alpha', String(w.panelAlpha)) }
+  if (w.hoverPlate !== undefined) V2PLATE = w.hoverPlate
+  if (w.panelDetail !== undefined) V2DETAIL = w.panelDetail
+  if (w.profile !== undefined) v2ApplyProfile(w.profile)
+  v2RenderHover(); (function(){try{v2RenderPanel()}catch(e){BRIDGE.log('v2RP ERR: '+(e&&e.message?e.message:String(e)))}})()
+}
+window.__v2State = function () { return { caps: V2.caps, detail: V2DETAIL, plate: V2PLATE, profile: V2PROFILE, alpha: V2ALPHA, progress: V2.progress, subagents: V2.subagents, row: V2.row } }
+</script>
+
+<script>
+/* ======================================================================
+   取色探针（?probe=1）：面板/黑板上**每一个可见文字元素**的实测几何 + 计算样式
+   —— 只读、只打日志，不改任何视觉。
+
+   为什么要它：对比度是"文字色 × 该元素矩形内**合成后**的真实背景"的函数，
+   而合成结果里含半透明黑板 α、四段渐变、22px 网格、斜高光，以及底下的壁纸，
+   靠读 CSS 手算必然出错（同一类 bug 已经靠"读代码推断"漏过一次：只修了 .trow2 .tw）。
+   所以这里把**测量所需的输入全部打印出来**，由测试侧解 PNG 取真实背景再算 WCAG。
+
+   ★ 测量口径必须与产品一致：`panel plate(tag)` 打印的**同一个矩形**（即 #plate 的
+     bounding rect，带 4px 内缩）作为"整块背景"取值窗口；#v2panel 只约束内容，
+     不是背景层（#v2panel 自身没有 background）。实现在 tests/v2.mjs 里。
+   ====================================================================== */
+var __PROBE_ON = String(Q.get('hide') || '').indexOf('hex=') === 0   /* 见下方 hide 通道说明：取色跑必开 */
+var __PROBE_SEL = '#plateInner .ph,#plateInner .tl,#plateInner .sh,#plateInner .sh .sl,#plateInner .sh .sr,' +
+  '#plateInner .t1,#plateInner .mt .ml,#plateInner .mt .mv,#plateInner .mt .mu,#plateInner .ebig,#plateInner .esub,' +
+  '#plateInner .esub2,#plateInner .slab,#plateInner .tstrip,#plateInner .tkrow,' +
+  '#v2panel .ph2,#v2panel .sh,#v2panel .mt,#v2panel .trow .tt,#v2panel .trow .mk,#v2panel .trow .tw,' +
+  '#v2panel .trow .ar,#v2panel .trow .tail,#v2panel .trow2 .tt,#v2panel .trow2 .mk,#v2panel .trow2 .tw,' +
+  '#v2panel .tx,#v2panel .srow,#v2panel .srow .agg,#v2panel .fold,#v2panel .plan,#v2panel .foot,#v2panel .cwlab'
+function __probeSkip (el) {
+  /* 只量**真正上色且承载文字**的叶子元素：
+     ① 有元素子节点的容器（.v2sec / .trow / .trow.root / .mt）自身不含独立颜色，
+        量它既会得到容器的继承色、又会与子块重复计一次（面板里的 .v2sec 比它的文字高几十 px）；
+     ② 纯装饰符号（树形引导符 '└' / 组间的 '·'）不承载信息，不进对比度断言。 */
+  for (var i = 0; i < el.children.length; i++) {
+    if ((el.children[i].textContent || '').trim()) return true
+  }
+  var txt = (el.textContent || '').replace(/\s+/g, ' ').trim()
+  if (!txt) return true
+  return !/[0-9A-Za-z\u4e00-\u9fff]/.test(txt)
+}
+window.__probePanel = function (tag) {
+  var t = tag || 'probe'
+  var out = []
+  Array.prototype.forEach.call(document.querySelectorAll(__PROBE_SEL), function (el) {
+    if (__probeSkip(el)) return
+    var r = el.getBoundingClientRect()
+    if (r.width < 1 || r.height < 1) return
+    var cs = window.getComputedStyle(el)
+    if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return
+    var txt = (el.textContent || '').replace(/\s+/g, ' ').trim()
+    if (!txt) return
+    var par = el.parentElement
+    var cls = '.' + String(el.className || '').trim().split(/\s+/)[0]
+    out.push([txt.slice(0, 40),
+      Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height),
+      cs.color, parseFloat(cs.fontSize), cs.fontWeight, cs.fontStyle,
+      el.tagName.toLowerCase(), cls,
+      cs.backgroundColor === 'rgba(0, 0, 0, 0)' ? 'none' : cs.backgroundColor,
+      par ? par.className : ''].join('|'))
+  })
+  /* 逐轮都打会让日志被同一份清单刷屏 ⇒ 只在**清单内容变了**时才留痕（仍然不漏掉任何一次变化） */
+  var sig = out.join(' ; ')
+  if (sig === window.__probeSig) return
+  window.__probeSig = sig
+  BRIDGE.log('panel probe(' + t + ') n=' + out.length + ' :: ' + sig)
+}
+/* 取色测试还要知道"当轮真实生效的壁纸"与"面板几何"，便于把对比度归因到确定的背景。
+   ⚠️ 这一行**必须门控**：它是本 script 块的**顶层语句**，不门控就会在**每次窗口加载**（含生产路径、
+   宿主零参数 spawn）往 helper.log 写一行 —— 那就等于把未完成的调试机制带上生产。
+   __PROBE_ON（L1542，由 hide=hex= 通道门控）在同一 script 块内已赋值，可直接用。 */
+if (__PROBE_ON) BRIDGE.log('probe ready wp=' + (window.__wpApplied ? 'yes' : 'no') + ' dpr=' + (window.devicePixelRatio || 1))
+/* 不再用启动定时器探针：数据是异步喂进来的，早打印会得到 0 块（等于什么都没测）。
+   真正的触发点在 logPanelLayout() 里，紧跟该轮 panel blocks 之后。 */
+</script>
+</body>
+</html>

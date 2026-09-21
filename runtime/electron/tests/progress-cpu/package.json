@@ -1,0 +1,7 @@
+{
+  "name": "progress-cpu-harness",
+  "version": "1.0.0",
+  "private": true,
+  "description": "进度条动效的 CPU 实测台（设计验证用，非生产代码）",
+  "main": "main.js"
+}

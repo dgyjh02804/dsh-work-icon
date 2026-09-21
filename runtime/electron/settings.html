@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>DSH 工作图标 · 配色设置</title>
+<style>
+  /* 一个**普通窗口**该有的样子：不透明、系统标题栏（由 BrowserWindow frame:true 提供）、可调大小。
+     这里不做任何"透明/无边框/置顶"的花样 —— 那是图标窗口的形态，不是设置窗口的。 */
+  html,body{margin:0;padding:0;height:100%}
+  body{background:#f5f7fa;color:#1d2530;font:13px/1.6 "Microsoft YaHei",system-ui,sans-serif;
+    -webkit-user-select:none;user-select:none}
+  .wrap{padding:16px 20px 22px;max-width:720px}
+  h1{font-size:16px;margin:0 0 4px}
+  .sub{color:#5c6a7a;font-size:12px;margin:0 0 14px}
+  fieldset{border:1px solid #d6dee8;border-radius:8px;background:#fff;margin:0 0 14px;padding:12px 14px 14px}
+  legend{font-size:12px;color:#33445a;padding:0 6px;font-weight:700}
+  .row{display:grid;grid-template-columns:186px 1fr 84px;align-items:center;gap:10px;margin:9px 0}
+  .row label{font-size:12.5px;color:#26313f}
+  .row .hint{grid-column:1/-1;font-size:11px;color:#6b7a8c;margin:-4px 0 2px}
+  input[type=range]{width:100%}
+  output{font:12px/1 ui-monospace,Consolas,monospace;text-align:right;color:#1d2530}
+  .btns{display:flex;gap:8px;margin-top:6px}
+  button{font:12.5px/1 "Microsoft YaHei",system-ui,sans-serif;padding:7px 14px;border-radius:6px;
+    border:1px solid #b9c6d6;background:#fff;cursor:pointer}
+  button:hover{background:#eef3f9}
+  /* 实时对比度面板：低于 4.5:1 **当场标红** —— 目的是让他不会不小心把自己调成看不清。 */
+  .ctr{background:#fff;border:1px solid #d6dee8;border-radius:8px;padding:12px 14px}
+  .ctr .big{font:700 22px/1.2 ui-monospace,Consolas,monospace;margin:2px 0 8px}
+  .ctr .line{display:flex;justify-content:space-between;font:12px/1.9 ui-monospace,Consolas,monospace;color:#33445a}
+  .bad{color:#c1121f !important}
+  .ok{color:#177245 !important}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;border:1px solid currentColor;margin-left:6px}
+  code{background:#eef3f9;padding:1px 5px;border-radius:4px;font-size:11.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>配色设置</h1>
+  <p class="sub">拖滑块 ⇒ 图标窗口<b>当场</b>变（同一个 Electron 实例的进程内 IPC，不经 DSH 宿主、不需要重启）。
+     设置只落在窗口侧自己的 <code>theme.json</code>，绝不写宿主的 <code>config.json</code>。</p>
+
+  <fieldset>
+    <legend>各层底色 / 亮度</legend>
+    <div class="row"><label for="hp">悬浮板底色深浅（α）</label>
+      <input id="hp" type="range" min="0" max="1" step="0.02" value="0"><output id="hpv"></output></div>
+    <div class="hint"><b>0 = 全删</b>（无底无框，内容直接浮在桌面上；当前默认）。0.94 = 改动前那一版（近黑薄板）。
+      调到 0 时文字会自动加描边补偿 —— 没有底之后，字形的边界只能由它自己扛。</div>
+
+    <div class="row"><label for="pa">大面板底色深浅（α）</label>
+      <input id="pa" type="range" min="0" max="1" step="0.02" value="0.78"><output id="pav"></output></div>
+    <div class="hint">下面展开的那块大面板（二十多行文字）。<b>默认保留</b>（0.78）。
+      勾上"跟随宿主配置"就交回给宿主那份配置里的值。</div>
+    <div class="row"><label for="paf">跟随宿主配置</label>
+      <input id="paf" type="checkbox" checked><output></output></div>
+
+    <div class="row"><label for="tb">文字亮度</label>
+      <input id="tb" type="range" min="0.5" max="2" step="0.05" value="1"><output id="tbv"></output></div>
+    <div class="hint">1.00 = 不改（默认）。只作用于承载文字的那几层，不动分区色图形档。</div>
+
+    <div class="row"><label for="po">面板整体不透明度</label>
+      <input id="po" type="range" min="0.2" max="1" step="0.02" value="1"><output id="pov"></output></div>
+    <div class="hint">整块大面板的透明度（底 + 上面所有文字一起）。1.00 = 不变。</div>
+
+    <div class="row"><label for="ib">图标亮度</label>
+      <input id="ib" type="range" min="0.4" max="1.6" step="0.05" value="1"><output id="ibv"></output></div>
+    <div class="hint">1.00 = 不变。</div>
+
+    <div class="btns">
+      <button id="reset">全部复位</button>
+      <button id="reload">从磁盘重读</button>
+    </div>
+  </fieldset>
+
+  <div class="ctr">
+    <div style="font-size:12px;color:#5c6a7a">当前最差对比度（小字门槛 4.5:1）</div>
+    <div class="big" id="worst">—</div>
+    <div class="line"><span>悬浮板 · 字身 vs 底</span><span id="c-fill">—</span></div>
+    <div class="line"><span>悬浮板 · 描边 vs 底</span><span id="c-stroke">—</span></div>
+    <div class="line"><span>大面板 · 字身 vs 底</span><span id="c-panel">—</span></div>
+    <div class="line" style="margin-top:8px;display:block;color:#6b7a8c;font-size:11px" id="how"></div>
+  </div>
+</div>
+
+<script>
+'use strict'
+/* ============================================================================
+   实时对比度：**公式合成**（快，够拖滑块时每帧算）
+     · 底(用户所见) = α·板色 + (1−α)·壁纸最亮取样
+     · 字身/描边 与它求 WCAG 比值
+   公式里的三个常量都来自**实测**，并且 tests/hover-plate.mjs / settings-window.mjs 有断言盯着它们别漂：
+     · 壁纸最亮取样：由主进程下发（WALLPAPER_WORST_*，来源是真实壁纸上四个屏幕角位形的取样）
+     · 最亮字身 / 描边色：取自 index.html 生产默认档（plate-b）里最不利的那两个
+   ⚠️ 这里只是**实时估算**；判"过不过"的像素复验在测试里做（快口径不许替代像素口径）。
+   ========================================================================== */
+var FILL_WORST = [248, 251, 253]      /* .st / .bl 的字身（--ink5 系，近白；对浅底最不利） */
+var STROKE = [3, 8, 16], STROKE_A = 0.96
+var HOVER_PLATE_RGB = [11, 22, 36]
+var PANEL_PLATE_RGB = [36, 55, 80]    /* plate-b 的 --p0..--p3 中段 */
+var HOVER_NOBG_MAX = 0.35
+var WP = { rgb: [141, 187, 203], lum: 0.4552 }
+
+function lin (v) { var s = v / 255; return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4) }
+function lum (c) { return 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]) }
+function ratio (a, b) { var A = lum(a), B = lum(b); return (Math.max(A, B) + 0.05) / (Math.min(A, B) + 0.05) }
+function mix (fg, a, bg) { return [0, 1, 2].map(function (k) { return a * fg[k] + (1 - a) * bg[k] }) }
+
+function fmt (c) { return 'rgb(' + c.map(Math.round).join(',') + ')' }
+function show (id, c, need) {
+  var el = document.getElementById(id)
+  el.textContent = c.r.toFixed(2) + ':1'
+  el.className = (c.r < need ? 'bad' : 'ok')
+}
+function compute (t) {
+  var wp = WP.rgb
+  var hpA = t.hoverPlateAlpha
+  var bgHover = mix(HOVER_PLATE_RGB, hpA, wp)                 /* 悬浮板：底 α 合成到壁纸 */
+  var fill = ratio(FILL_WORST, bgHover)
+  var strokePx = mix(STROKE, STROKE_A, bgHover)
+  var stroke = ratio(strokePx, bgHover)
+  var panelA = (t.panelAlpha === null || t.panelAlpha === undefined) ? t.effectivePanelAlpha : t.panelAlpha
+  var bgPanel = mix(PANEL_PLATE_RGB, panelA, wp)
+  var panel = ratio(FILL_WORST, bgPanel)
+  var nobg = hpA <= HOVER_NOBG_MAX
+  /* ★ 判据取**实际可见的那一层**：
+       · 有底（α>0.35）时字身上面没有描边 ⇒ 可读性由**字身**扛 ⇒ 判据 = fill；
+       · 无底（α≤0.35）时字身与亮壁纸几乎同色，可见的边界只剩那圈**描边** ⇒ 判据 = stroke。
+     取 min(fill,stroke) 是错的：有底时描边与底同色、它本来就不该参与判据（上一版就是这么错的，实测抓到）。 */
+  var key = nobg ? stroke : fill
+  return { hoverA: hpA, panelA: panelA, bgHover: bgHover, bgPanel: bgPanel, fill: fill, stroke: stroke, panel: panel,
+    nobg: nobg, key: key, keyName: nobg ? '描边' : '字身', worst: Math.min(key, panel) }
+}
+/* 全量重画（读一次主题 → 写 DOM） */
+var CUR = null
+function paint (t) {
+  CUR = t
+  document.getElementById('hp').value = String(t.hoverPlateAlpha)
+  document.getElementById('pa').value = String(t.panelAlpha === null || t.panelAlpha === undefined ? t.effectivePanelAlpha : t.panelAlpha)
+  document.getElementById('paf').checked = (t.panelAlpha === null || t.panelAlpha === undefined)
+  document.getElementById('pa').disabled = document.getElementById('paf').checked
+  document.getElementById('tb').value = String(t.textBoost)
+  document.getElementById('po').value = String(t.panelOpacity)
+  document.getElementById('ib').value = String(t.iconBright)
+  document.getElementById('hpv').textContent = Number(t.hoverPlateAlpha).toFixed(2) + (t.hoverPlateAlpha <= HOVER_NOBG_MAX ? '（全删）' : '')
+  document.getElementById('pav').textContent = Number(document.getElementById('pa').value).toFixed(2)
+  document.getElementById('tbv').textContent = Number(t.textBoost).toFixed(2)
+  document.getElementById('pov').textContent = Number(t.panelOpacity).toFixed(2)
+  document.getElementById('ibv').textContent = Number(t.iconBright).toFixed(2)
+  if (t.wallpaperWorst) WP = { rgb: t.wallpaperWorst.rgb, lum: t.wallpaperWorst.lum }
+  paintContrast()
+}
+function paintContrast () {
+  if (!CUR) return
+  var c = compute(CUR)
+  var w = document.getElementById('worst')
+  /* 大数字 = **实际可见的那一层**（悬浮板）与大面板字身两者里更差的那个 —— 两个都是"看得见的墨 vs 底"，
+     可以取 min；但**不能**把"有底时与底同色、本来就看不见的那圈描边"算进来（那会让数字永远红，
+     用户就会学会无视它）。所以判据 = 见 compute() 里的 key。 */
+  w.textContent = c.worst.toFixed(2) + ':1　' + (c.worst < 4.5 ? '偏低（<4.5:1）' : '达标（≥4.5:1）')
+  w.className = 'big ' + (c.worst < 4.5 ? 'bad' : 'ok')
+  show('c-fill', { r: c.fill }, 4.5)
+  show('c-stroke', { r: c.stroke }, 4.5)
+  show('c-panel', { r: c.panel }, 4.5)
+  document.getElementById('how').textContent =
+    '悬浮板判据取「' + c.keyName + '」：' + (c.nobg ? '没有底 ⇒ 字身与亮壁纸几乎同色，可见的边界只剩描边' :
+      '有底 ⇒ 没有描边，可读性由字身扛') + '；' +
+    '口径：α 合成到壁纸最亮取样 ' + fmt(WP.rgb) + '（亮度 ' + lum(WP.rgb).toFixed(4) + '）；' +
+    '悬浮板底 ' + fmt(c.bgHover) + '（α=' + c.hoverA.toFixed(2) + '）；大面板底 ' + fmt(c.bgPanel) + '（α=' + c.panelA.toFixed(2) + '）。'
+}
+/* 滑块：input 事件里**边拖边发**（这就是"实时热更新"那条路） */
+function bind (id, key, isPanelAlpha) {
+  var el = document.getElementById(id)
+  el.addEventListener('input', function () {
+    var v = Number(el.value)
+    var patch = {}
+    if (isPanelAlpha) {
+      /* 拖一下就"接管"：自动取消"跟随宿主配置"（否则滑块是灰的、拖不动，用户会以为坏了） */
+      var paf = document.getElementById('paf')
+      if (paf.checked) { paf.checked = false; el.disabled = false }
+      patch.panelAlpha = v
+    } else patch[key] = v
+    window.settings.set(patch).then(function (t) { paint(t); log('set ' + JSON.stringify(patch) + ' -> ' + JSON.stringify(t)) })
+  })
+}
+function log (m) { try { console.log('[settings] ' + m) } catch (e) { /* ignore */ } }
+bind('hp', 'hoverPlateAlpha', false)
+bind('pa', 'panelAlpha', true)
+bind('tb', 'textBoost', false)
+bind('po', 'panelOpacity', false)
+bind('ib', 'iconBright', false)
+document.getElementById('paf').addEventListener('change', function () {
+  var ck = document.getElementById('paf').checked
+  window.settings.set({ panelAlpha: ck ? null : Number(document.getElementById('pa').value) })
+    .then(function (t) { paint(t); log('follow-host ' + ck) })
+})
+document.getElementById('reset').addEventListener('click', function () {
+  window.settings.reset().then(function (t) { paint(t); log('reset -> ' + JSON.stringify(t)) })
+})
+document.getElementById('reload').addEventListener('click', function () {
+  window.settings.get().then(function (t) { paint(t); log('reload -> ' + JSON.stringify(t)) })
+})
+window.settings.onTheme(function (t) { paint(t); log('theme <- (push)') })
+/* 测试用：把当前 UI 的**可判定状态**一次吐出来（不合成任何真实输入，只读 DOM） */
+window.__ui = function () {
+  var c = compute(CUR || { hoverPlateAlpha: 0, panelAlpha: null, effectivePanelAlpha: 0.78, textBoost: 1, panelOpacity: 1, iconBright: 1 })
+  return {
+    values: { hoverPlateAlpha: Number(document.getElementById('hp').value), panelAlpha: document.getElementById('paf').checked ? null : Number(document.getElementById('pa').value),
+      textBoost: Number(document.getElementById('tb').value), panelOpacity: Number(document.getElementById('po').value), iconBright: Number(document.getElementById('ib').value) },
+    worstText: document.getElementById('worst').textContent,
+    worstClass: document.getElementById('worst').className,
+    worstValue: c.worst, keyValue: c.key, keyName: c.keyName, nobg: c.nobg,
+    fillValue: c.fill, strokeValue: c.stroke, panelValue: c.panel,
+    fillRed: document.getElementById('c-fill').className, strokeRed: document.getElementById('c-stroke').className,
+    wp: WP.rgb, fillConst: FILL_WORST, strokeConst: STROKE, panelPlateConst: PANEL_PLATE_RGB, hoverPlateConst: HOVER_PLATE_RGB
+  }
+}
+window.__icon = function () { return window.settings.iconState() }
+window.settings.get().then(function (t) { paint(t); log('init ' + JSON.stringify(t)) })
+</script>
+</body>
+</html>

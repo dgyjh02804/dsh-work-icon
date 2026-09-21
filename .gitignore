@@ -1,0 +1,36 @@
+# 依赖（Electron 运行时体积很大，不入库）
+node_modules/
+**/node_modules/
+
+# 测试产物
+# runtime/electron/test/out/ 下有【数以万计】的运行目录（每次跑套件都会新增一批），
+# 它们是可再生的中间产物，不入库。
+test/out/
+runtime/electron/test/out/
+
+# 日志与诊断留痕（含本机路径与真实会话数据）
+*.log
+host.log
+helper.log
+
+# 本机 / 临时产物
+*.tmp
+*.bak
+_snap_*
+
+# 会话交接单（给新会话看的，不进仓库）
+HANDOFF.md
+.DS_Store
+Thumbs.db
+
+# 测试套件自己生成的脏文件（跑一次就多一批，不入库）
+# golden/selftest.mjs 会 mkdirSync 重建 tmp/；golden/compare.mjs 会在 refs/ 留下对比热图。
+runtime/electron/golden/tmp/
+*-diff-heatmap.png
+
+# 别的会话留下的修复包说明（临时文档，不进仓库）
+1.txt
+
+# 编辑器
+.vscode/
+.idea/

@@ -1,0 +1,1318 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>v2 · 最外圈另起一层（r=88）</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:system-ui,"Microsoft YaHei",sans-serif;background:#0d1117;color:#e4ecf4;width:1260px}
+.bar{position:sticky;top:0;z-index:9;background:#111823;border-bottom:1px solid #23303f;padding:8px 14px;white-space:nowrap}
+.bar a{color:#6fb6ff;text-decoration:none;font-size:12px;margin-right:12px}
+.bar button{background:#1b2634;color:#cfe0ea;border:1px solid #33506a;border-radius:3px;padding:3px 9px;font-size:11px;margin-right:6px;cursor:pointer}
+.bar button.on{background:#56d9c8;color:#0d1117;border-color:#56d9c8;font-weight:700}
+.bar .nm{font-size:13px;font-weight:700;margin-right:12px}
+#probe{display:inline-block;font:400 10px/18px ui-monospace,Consolas,monospace;color:#7e94ac;margin-left:10px;padding-left:10px;border-left:1px solid #2a3a4c}
+#probe b{color:#8fe0d2}
+#jserr{display:inline-block;font:400 10px/18px ui-monospace,Consolas,monospace;color:#ff8b8b;margin-left:10px}
+.row{white-space:nowrap}
+.side{display:inline-block;vertical-align:top}
+.desk{position:relative;width:620px;height:300px;overflow:hidden}
+.desk.dk{background:linear-gradient(158deg,#3c4147,#33383e 46%,#292d32)}
+.desk.lt{background:linear-gradient(158deg,#eceae5,#dedbd4 52%,#cfccc5)}
+.iconw{position:absolute;left:26px;top:26px}
+.hovw{position:absolute;left:26px;top:196px}
+.panw{position:absolute;left:300px;top:40px}
+
+/* ===== 图标本体（几何与 runtime 完全一致） ===== */
+.ico{display:block}
+/* 与 runtime 同一条：轴心 50% 50% + transform-box:view-box（绝不用 rotate(a 100 100) 双轴心） */
+.cloud,.seg,.prun{will-change:transform;transform-origin:50% 50%;transform-box:view-box}
+body[data-freeze="1"] .cloud,body[data-freeze="1"] .seg,body[data-freeze="1"] .prun{will-change:auto}
+.core{transform:none}
+.pfill,.ptrack,.pmark{transition:none}
+.pmark{transition:opacity .25s linear}
+/* 完成态爆散：静态几何 + scale/opacity（无 blur、无 box-shadow、无 backdrop-filter） */
+.burstring,.bursthalo,.burstcore{transform-origin:50% 50%;transform-box:view-box}
+.lyr{display:none}
+/* 状态由 SVG 根上的 .st-* 单选（与 runtime 的 .layer.st-* 同一手法），只显示这一态那 7 层 */
+.st-IDLE .lyr-IDLE,.st-THINKING .lyr-THINKING,.st-WORKING .lyr-WORKING,.st-WAITING .lyr-WAITING,
+.st-SUCCESS .lyr-SUCCESS,.st-ERROR .lyr-ERROR,.st-DISCONNECTED .lyr-DISCONNECTED{display:inline}
+/* 七态配色：逐项照抄 runtime 的 .st-*（c1 / c2 / core） */
+.st-IDLE        {--c1:#3d7688;--c2:#1b3b47;--glow:rgba(80,190,220,.20);--core:.13}
+.st-THINKING    {--c1:#38e8ff;--c2:#176c85;--glow:rgba(56,232,255,.55);--core:.42}
+.st-WORKING     {--c1:#5cffd0;--c2:#128f78;--glow:rgba(92,255,208,.62);--core:1}
+.st-WAITING     {--c1:#ffb340;--c2:#a35a08;--glow:rgba(255,179,64,.62);--core:.55}
+.st-SUCCESS     {--c1:#8dffae;--c2:#1f9b5a;--glow:rgba(141,255,174,.55);--core:1}
+.st-ERROR       {--c1:#ff4d6d;--c2:#8e0f2a;--glow:rgba(255,77,109,.62);--core:.7}
+.st-DISCONNECTED{--c1:#5a636e;--c2:#2b3138;--glow:rgba(140,150,160,.16);--core:.2}
+/* 核心辉光：runtime 用 SVG opacity="calc(var(--core) * .2)"（现代 Chromium 支持），
+   但 --core 必须定义在同一个 SVG 根上才解析得到 —— 上面的 .st-* 就挂在 SVG 根上。 */
+.glowA{opacity:calc(var(--core,.55) * .2)}
+
+/* ===== 悬浮层（1:1 抄 runtime 的 v2hover 口径：272 宽 / plate 底） ===== */
+#hov{position:absolute;width:272px;padding:5px 7px;border-radius:5px;background:rgba(16,30,47,.78);
+  border:1px solid rgba(74,127,168,.85);font-family:ui-monospace,Consolas,monospace;pointer-events:none}
+#hov .r1{height:15px;line-height:15px;white-space:nowrap}
+#hov .st{font-size:12.5px;font-weight:700;color:#f4f8fa}
+#hov .tok{float:right;font-size:9px;color:#cfe0ea}
+#hov .h3{display:block;height:12px;line-height:12px;font-size:9.5px;color:#bcd0dd;white-space:nowrap;overflow:hidden}
+#hov .r2{display:block;height:15px;line-height:15px;font-size:10px;color:#cfdcea;white-space:nowrap}
+#hov .r2 .k{color:#8fa8bd}
+#hov .r2 .v{color:#e8f0fa;font-variant-numeric:tabular-nums}
+#hov .r3{display:block;height:13px;line-height:13px;font-size:9px;color:#ffc266;white-space:nowrap;overflow:hidden}
+#hov .r3:empty{display:none}
+#hov .r3 .a{color:#7fe3c8}
+/* 子弹图（与 runtime .v2bullet 同款：区间底 + 实际值 scaleX + 上限竖线） */
+.bl2{position:relative;display:block;height:13px}
+.bl2 .bq{position:absolute;left:0;top:3px;height:6px;background:rgba(232,244,252,.2);border-radius:1px;width:258px}
+.bl2 .bs{position:absolute;top:3px;left:0;height:6px;background:#56d9c8;border-radius:1px;width:258px;
+  transform-origin:0 50%;transform:scaleX(0)}
+.bl2 .bt{position:absolute;top:0;width:1px;height:12px;background:#ffc266;left:258px}
+.bl2 .bl{position:absolute;right:0;top:0;font-size:8.5px;line-height:13px;color:#e6eef4;white-space:nowrap}
+
+/* ===== 完整面板：多对话多条进度条（1:1 抄 runtime 的面板口径 440 宽） ===== */
+#pan{width:440px;border:1px solid #4a7fa8;border-radius:5px;padding:9px 14px 11px;
+  background:linear-gradient(168deg,rgba(24,41,63,.82) 0%,rgba(18,33,52,.8) 38%,rgba(14,26,42,.8) 100%)}
+#pan .ph2{height:13px;line-height:13px;font:400 8.5px/1 ui-monospace,Consolas,monospace;color:#c3d6e6;letter-spacing:1.4px}
+#pan .ph2 .he{float:right;letter-spacing:0}
+#pan .sess{margin-top:7px}
+#pan .srow{height:15px;line-height:15px;font-size:10.5px;color:#cfdcea;white-space:nowrap;overflow:hidden}
+#pan .srow .agg{float:right;font:400 9px/15px ui-monospace,Consolas,monospace;color:#e8f0fa}
+#pan .sbar{position:relative;display:block;height:7px;margin:1px 0 2px}
+#pan .sq{position:absolute;left:0;top:2px;height:3px;width:412px;background:rgba(232,244,252,.18);border-radius:1px}
+#pan .sf{position:absolute;top:2px;left:0;height:3px;width:412px;background:#56d9c8;border-radius:1px;transform-origin:0 50%;transform:scaleX(0)}
+#pan .sbar .sm{position:absolute;top:0;width:1px;height:7px;background:#ffc266}
+#pan .plan{font:400 8.5px/12px ui-monospace,Consolas,monospace;color:#ffc266;height:12px;white-space:nowrap;overflow:hidden}
+#pan .tree2{margin-top:8px}
+#pan .trow{position:relative;height:19px;line-height:19px;font-size:10.5px;white-space:nowrap;overflow:hidden}
+#pan .trow.d1{padding-left:11px}#pan .trow.d2{padding-left:22px}
+#pan .trow .tw{color:#4d6b86;font-family:ui-monospace,Consolas,monospace}
+#pan .trow .tail{float:right;font:400 8.5px/19px ui-monospace,Consolas,monospace;color:#92aac0;margin-left:8px}
+#pan .trow .ic{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:7px;vertical-align:0}
+#pan .trow .ic.run{background:#56d9c8}#pan .trow .ic.done{background:#7fe3c8}
+#pan .trow .ic.wait{background:none;border:1.3px solid #7e94ac}
+#pan .foot{margin-top:7px;padding-top:5px;border-top:1px solid rgba(157,196,230,.16);
+  font:400 8.5px/1.5 ui-monospace,Consolas,monospace;color:#7e94ac;white-space:normal}
+
+.cap{padding:16px 22px 26px;background:#111823;color:#e4ecf4;width:1260px}
+.cap h3{margin:0 0 8px;font-size:16px}
+.cap h3 .ref{font-size:10px;color:#6fb6ff;border:1px solid #2e4a63;border-radius:3px;padding:1px 6px;margin-left:8px;vertical-align:2px}
+.cap div{font-size:11.5px;line-height:1.78;color:#a9bccd}
+.cap .k{display:inline-block;width:112px;color:#7e94ac;vertical-align:top}
+.cap b{color:#e4ecf4}
+.cap table{border-collapse:collapse;margin-top:6px;font:400 11px/1.65 ui-monospace,Consolas,monospace;color:#a9bccd;white-space:normal}
+.cap td,.cap th{border:1px solid #26313d;padding:3px 9px;text-align:left;vertical-align:top}
+.cap ul{margin:4px 0 0 18px;padding:0}.cap li{margin:3px 0}
+</style></head><body data-ticks="0" data-fpstier="standard" data-state="advance" data-p="0">
+<div class="bar"><a href="./index.html">← 两个版本对照</a>  <a href="./v1-reuse-arcs.html">切到 v1 复用弧</a>
+  <span class="nm">v2 · 最外圈另起一层（r=88）</span>
+  <button id="toggle">暂停</button>
+  <button data-tier="eco">省电</button><button data-tier="standard" class="on">标准</button><button data-tier="smooth">流畅</button>
+  <button id="ptoggle">隐藏面板</button>
+  <span style="display:inline-block;font:400 10px/18px ui-monospace,Consolas,monospace;color:#92aac0;margin-left:8px">
+    档位 <b id="fv" style="color:#56d9c8">15 fps</b></span>
+  <span id="probe">ticks <b>0</b></span><span id="jserr"></span>
+</div>
+<div class="row">
+  <div class="side"><div class="desk dk">
+    <div class="iconw"><svg class="ico" id="ico1" viewBox="0 0 200 200" width="144" height="144" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><g>
+<g id="layer-IDLEv2" class="lyr lyr-IDLE" data-st="IDLE">
+  <defs>
+    <radialGradient id="plateGrad-IDLEv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-IDLEv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-IDLEv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-IDLEv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="73.4" cy="113.8" r="0.89" fill="var(--c1)" opacity="0.28"/><circle cx="78.5" cy="132.4" r="0.94" fill="var(--c1)" opacity="0.30"/><circle cx="63.4" cy="137.3" r="1.03" fill="var(--c1)" opacity="0.35"/><circle cx="99.4" cy="156.0" r="1.03" fill="var(--c1)" opacity="0.35"/><circle cx="138.9" cy="55.5" r="1.06" fill="var(--c1)" opacity="0.36"/><circle cx="43.4" cy="90.2" r="1.07" fill="var(--c1)" opacity="0.37"/><circle cx="96.6" cy="36.2" r="1.08" fill="var(--c1)" opacity="0.37"/><circle cx="64.8" cy="44.9" r="1.16" fill="var(--c1)" opacity="0.41"/><circle cx="63.1" cy="157.0" r="1.17" fill="var(--c1)" opacity="0.42"/><circle cx="172.3" cy="124.7" r="1.23" fill="var(--c1)" opacity="0.45"/><circle cx="175.0" cy="117.9" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="88.6" cy="29.6" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="178.4" cy="122.1" r="1.31" fill="var(--c1)" opacity="0.49"/><circle cx="138.8" cy="178.4" r="1.51" fill="var(--c1)" opacity="0.59"/><circle cx="18.3" cy="137.8" r="1.52" fill="var(--c1)" opacity="0.59"/><circle cx="52.7" cy="28.2" r="1.53" fill="var(--c1)" opacity="0.60"/><circle cx="131.7" cy="181.8" r="1.54" fill="var(--c1)" opacity="0.60"/><circle cx="192.6" cy="90.5" r="1.57" fill="var(--c1)" opacity="0.62"/><circle cx="141.5" cy="35.6" r="1.60" fill="var(--c1)" opacity="0.63"/><circle cx="150.2" cy="170.4" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="21.4" cy="120.5" r="1.72" fill="var(--c1)" opacity="0.69"/><circle cx="169.4" cy="160.3" r="1.72" fill="var(--c1)" opacity="0.69"/><circle cx="164.3" cy="59.1" r="1.87" fill="var(--c1)" opacity="0.76"/><circle cx="160.8" cy="137.4" r="1.95" fill="var(--c1)" opacity="0.80"/><circle cx="31.8" cy="123.0" r="2.01" fill="var(--c1)" opacity="0.83"/><circle cx="169.0" cy="93.2" r="2.02" fill="var(--c1)" opacity="0.84"/><circle cx="37.1" cy="120.4" r="2.05" fill="var(--c1)" opacity="0.85"/><circle cx="166.5" cy="87.7" r="2.06" fill="var(--c1)" opacity="0.86"/><circle cx="76.2" cy="46.9" r="2.10" fill="var(--c1)" opacity="0.88"/><circle cx="124.0" cy="154.8" r="2.16" fill="var(--c1)" opacity="0.91"/><circle cx="154.3" cy="111.1" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="74.8" cy="64.2" r="2.22" fill="var(--c1)" opacity="0.94"/><circle cx="143.3" cy="124.3" r="2.22" fill="var(--c1)" opacity="0.94"/><circle cx="80.6" cy="66.5" r="2.25" fill="var(--c1)" opacity="0.95"/><circle cx="92.6" cy="135.5" r="2.29" fill="var(--c1)" opacity="0.97"/><circle cx="110.1" cy="79.9" r="2.33" fill="var(--c1)" opacity="0.99"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-IDLEv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="0.13"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="0.13"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-IDLEv2)" opacity="0"/>
+</g>
+
+<g id="layer-THINKINGv2" class="lyr lyr-THINKING" data-st="THINKING">
+  <defs>
+    <radialGradient id="plateGrad-THINKINGv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-THINKINGv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-THINKINGv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-THINKINGv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="91.2" cy="114.4" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="88.8" cy="116.9" r="0.88" fill="var(--c1)" opacity="0.27"/><circle cx="121.1" cy="123.9" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="81.4" cy="124.6" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="124.6" cy="64.1" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="153.0" cy="105.4" r="1.05" fill="var(--c1)" opacity="0.36"/><circle cx="44.2" cy="88.1" r="1.07" fill="var(--c1)" opacity="0.37"/><circle cx="157.7" cy="71.0" r="1.09" fill="var(--c1)" opacity="0.38"/><circle cx="114.9" cy="155.7" r="1.11" fill="var(--c1)" opacity="0.39"/><circle cx="58.1" cy="142.2" r="1.12" fill="var(--c1)" opacity="0.39"/><circle cx="68.8" cy="45.7" r="1.14" fill="var(--c1)" opacity="0.40"/><circle cx="41.3" cy="131.7" r="1.16" fill="var(--c1)" opacity="0.41"/><circle cx="30.7" cy="67.9" r="1.18" fill="var(--c1)" opacity="0.42"/><circle cx="22.4" cy="88.8" r="1.21" fill="var(--c1)" opacity="0.44"/><circle cx="34.4" cy="139.4" r="1.23" fill="var(--c1)" opacity="0.45"/><circle cx="102.0" cy="164.3" r="1.24" fill="var(--c1)" opacity="0.45"/><circle cx="87.5" cy="35.0" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="61.5" cy="166.4" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="41.6" cy="58.9" r="1.27" fill="var(--c1)" opacity="0.47"/><circle cx="164.7" cy="137.8" r="1.30" fill="var(--c1)" opacity="0.48"/><circle cx="137.3" cy="36.9" r="1.35" fill="var(--c1)" opacity="0.51"/><circle cx="24.6" cy="99.5" r="1.41" fill="var(--c1)" opacity="0.54"/><circle cx="56.1" cy="30.1" r="1.43" fill="var(--c1)" opacity="0.55"/><circle cx="180.4" cy="62.7" r="1.43" fill="var(--c1)" opacity="0.55"/><circle cx="36.8" cy="141.4" r="1.51" fill="var(--c1)" opacity="0.58"/><circle cx="169.5" cy="57.1" r="1.51" fill="var(--c1)" opacity="0.58"/><circle cx="166.8" cy="59.4" r="1.53" fill="var(--c1)" opacity="0.60"/><circle cx="9.2" cy="113.0" r="1.55" fill="var(--c1)" opacity="0.61"/><circle cx="176.1" cy="114.3" r="1.58" fill="var(--c1)" opacity="0.62"/><circle cx="167.1" cy="153.7" r="1.59" fill="var(--c1)" opacity="0.63"/><circle cx="174.1" cy="139.8" r="1.60" fill="var(--c1)" opacity="0.63"/><circle cx="97.5" cy="187.8" r="1.62" fill="var(--c1)" opacity="0.64"/><circle cx="76.3" cy="29.4" r="1.62" fill="var(--c1)" opacity="0.64"/><circle cx="145.6" cy="161.0" r="1.69" fill="var(--c1)" opacity="0.68"/><circle cx="131.6" cy="33.3" r="1.70" fill="var(--c1)" opacity="0.68"/><circle cx="152.8" cy="34.1" r="1.72" fill="var(--c1)" opacity="0.69"/><circle cx="81.5" cy="16.8" r="1.76" fill="var(--c1)" opacity="0.71"/><circle cx="176.4" cy="113.7" r="1.80" fill="var(--c1)" opacity="0.73"/><circle cx="39.3" cy="142.9" r="1.80" fill="var(--c1)" opacity="0.73"/><circle cx="177.5" cy="96.4" r="1.83" fill="var(--c1)" opacity="0.75"/><circle cx="123.9" cy="33.8" r="1.85" fill="var(--c1)" opacity="0.75"/><circle cx="74.6" cy="166.9" r="1.86" fill="var(--c1)" opacity="0.76"/><circle cx="174.2" cy="59.6" r="1.88" fill="var(--c1)" opacity="0.77"/><circle cx="28.7" cy="90.2" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="109.0" cy="170.4" r="1.92" fill="var(--c1)" opacity="0.79"/><circle cx="155.9" cy="49.9" r="1.98" fill="var(--c1)" opacity="0.82"/><circle cx="159.5" cy="129.7" r="1.99" fill="var(--c1)" opacity="0.82"/><circle cx="163.7" cy="124.0" r="1.99" fill="var(--c1)" opacity="0.82"/><circle cx="109.2" cy="40.4" r="2.04" fill="var(--c1)" opacity="0.85"/><circle cx="129.2" cy="45.8" r="2.04" fill="var(--c1)" opacity="0.85"/><circle cx="106.0" cy="37.7" r="2.09" fill="var(--c1)" opacity="0.87"/><circle cx="106.0" cy="47.5" r="2.11" fill="var(--c1)" opacity="0.88"/><circle cx="135.4" cy="141.6" r="2.11" fill="var(--c1)" opacity="0.88"/><circle cx="50.4" cy="132.3" r="2.16" fill="var(--c1)" opacity="0.91"/><circle cx="58.2" cy="132.2" r="2.20" fill="var(--c1)" opacity="0.93"/><circle cx="146.9" cy="95.7" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="63.3" cy="65.2" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="51.2" cy="81.8" r="2.22" fill="var(--c1)" opacity="0.94"/><circle cx="73.8" cy="65.5" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="73.3" cy="131.6" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="139.8" cy="113.5" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="114.0" cy="135.5" r="2.27" fill="var(--c1)" opacity="0.96"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-THINKINGv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="0.42"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="0.42"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-THINKINGv2)" opacity="0"/>
+</g>
+
+<g id="layer-WORKINGv2" class="lyr lyr-WORKING" data-st="WORKING">
+  <defs>
+    <radialGradient id="plateGrad-WORKINGv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-WORKINGv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-WORKINGv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-WORKINGv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="94.3" cy="108.6" r="0.86" fill="var(--c1)" opacity="0.26"/><circle cx="98.1" cy="83.3" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="95.8" cy="81.3" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="92.4" cy="126.1" r="0.89" fill="var(--c1)" opacity="0.28"/><circle cx="129.0" cy="107.9" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="133.6" cy="107.5" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="66.3" cy="104.5" r="0.92" fill="var(--c1)" opacity="0.29"/><circle cx="131.1" cy="88.7" r="0.93" fill="var(--c1)" opacity="0.30"/><circle cx="120.5" cy="69.0" r="0.93" fill="var(--c1)" opacity="0.30"/><circle cx="63.2" cy="93.8" r="0.95" fill="var(--c1)" opacity="0.31"/><circle cx="60.4" cy="79.7" r="0.95" fill="var(--c1)" opacity="0.31"/><circle cx="65.0" cy="119.3" r="0.97" fill="var(--c1)" opacity="0.32"/><circle cx="93.2" cy="147.8" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="55.7" cy="76.4" r="1.00" fill="var(--c1)" opacity="0.33"/><circle cx="54.4" cy="97.7" r="1.01" fill="var(--c1)" opacity="0.34"/><circle cx="144.9" cy="71.0" r="1.04" fill="var(--c1)" opacity="0.35"/><circle cx="141.8" cy="65.3" r="1.04" fill="var(--c1)" opacity="0.36"/><circle cx="58.9" cy="57.8" r="1.12" fill="var(--c1)" opacity="0.39"/><circle cx="62.4" cy="49.0" r="1.15" fill="var(--c1)" opacity="0.41"/><circle cx="94.1" cy="38.2" r="1.17" fill="var(--c1)" opacity="0.42"/><circle cx="130.7" cy="49.9" r="1.19" fill="var(--c1)" opacity="0.43"/><circle cx="70.3" cy="152.2" r="1.22" fill="var(--c1)" opacity="0.44"/><circle cx="73.2" cy="45.8" r="1.23" fill="var(--c1)" opacity="0.45"/><circle cx="123.1" cy="35.1" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="141.8" cy="54.0" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="120.8" cy="41.7" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="167.1" cy="132.3" r="1.28" fill="var(--c1)" opacity="0.47"/><circle cx="70.6" cy="26.4" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="19.8" cy="85.5" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="181.3" cy="86.3" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="169.4" cy="128.7" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="32.0" cy="103.5" r="1.35" fill="var(--c1)" opacity="0.50"/><circle cx="144.5" cy="44.6" r="1.36" fill="var(--c1)" opacity="0.51"/><circle cx="156.9" cy="60.7" r="1.39" fill="var(--c1)" opacity="0.53"/><circle cx="159.6" cy="49.4" r="1.39" fill="var(--c1)" opacity="0.53"/><circle cx="21.7" cy="117.4" r="1.45" fill="var(--c1)" opacity="0.56"/><circle cx="164.0" cy="40.7" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="173.5" cy="60.3" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="171.9" cy="77.7" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="25.2" cy="117.9" r="1.51" fill="var(--c1)" opacity="0.59"/><circle cx="183.4" cy="123.8" r="1.55" fill="var(--c1)" opacity="0.60"/><circle cx="181.2" cy="64.1" r="1.60" fill="var(--c1)" opacity="0.63"/><circle cx="43.8" cy="55.4" r="1.62" fill="var(--c1)" opacity="0.64"/><circle cx="31.3" cy="138.9" r="1.63" fill="var(--c1)" opacity="0.65"/><circle cx="26.9" cy="107.8" r="1.65" fill="var(--c1)" opacity="0.65"/><circle cx="28.2" cy="100.6" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="58.4" cy="33.9" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="183.7" cy="119.0" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="51.7" cy="29.6" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="118.3" cy="177.4" r="1.68" fill="var(--c1)" opacity="0.67"/><circle cx="40.2" cy="152.3" r="1.70" fill="var(--c1)" opacity="0.68"/><circle cx="148.3" cy="33.3" r="1.70" fill="var(--c1)" opacity="0.68"/><circle cx="72.6" cy="173.6" r="1.71" fill="var(--c1)" opacity="0.68"/><circle cx="188.0" cy="94.4" r="1.77" fill="var(--c1)" opacity="0.71"/><circle cx="179.8" cy="133.6" r="1.77" fill="var(--c1)" opacity="0.72"/><circle cx="17.7" cy="97.7" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="22.6" cy="103.2" r="1.79" fill="var(--c1)" opacity="0.72"/><circle cx="173.8" cy="126.0" r="1.81" fill="var(--c1)" opacity="0.73"/><circle cx="51.8" cy="31.5" r="1.81" fill="var(--c1)" opacity="0.74"/><circle cx="170.4" cy="64.8" r="1.86" fill="var(--c1)" opacity="0.76"/><circle cx="149.5" cy="47.8" r="1.88" fill="var(--c1)" opacity="0.77"/><circle cx="17.5" cy="114.4" r="1.88" fill="var(--c1)" opacity="0.77"/><circle cx="38.0" cy="74.0" r="1.90" fill="var(--c1)" opacity="0.78"/><circle cx="118.2" cy="40.6" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="175.9" cy="131.9" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="123.2" cy="167.6" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="138.1" cy="157.0" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="110.6" cy="162.0" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="38.4" cy="59.6" r="1.97" fill="var(--c1)" opacity="0.81"/><circle cx="38.4" cy="137.4" r="1.98" fill="var(--c1)" opacity="0.82"/><circle cx="96.8" cy="39.1" r="1.98" fill="var(--c1)" opacity="0.82"/><circle cx="32.9" cy="107.7" r="2.01" fill="var(--c1)" opacity="0.83"/><circle cx="83.5" cy="162.5" r="2.03" fill="var(--c1)" opacity="0.84"/><circle cx="70.6" cy="148.3" r="2.05" fill="var(--c1)" opacity="0.85"/><circle cx="138.2" cy="138.8" r="2.07" fill="var(--c1)" opacity="0.86"/><circle cx="74.0" cy="54.5" r="2.12" fill="var(--c1)" opacity="0.89"/><circle cx="52.8" cy="70.5" r="2.12" fill="var(--c1)" opacity="0.89"/><circle cx="96.5" cy="48.6" r="2.15" fill="var(--c1)" opacity="0.90"/><circle cx="131.6" cy="59.5" r="2.16" fill="var(--c1)" opacity="0.90"/><circle cx="42.8" cy="97.4" r="2.17" fill="var(--c1)" opacity="0.91"/><circle cx="143.8" cy="92.8" r="2.19" fill="var(--c1)" opacity="0.92"/><circle cx="146.2" cy="114.4" r="2.19" fill="var(--c1)" opacity="0.92"/><circle cx="117.3" cy="56.8" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="59.8" cy="112.8" r="2.22" fill="var(--c1)" opacity="0.94"/><circle cx="97.3" cy="138.5" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="126.1" cy="136.9" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="140.4" cy="81.3" r="2.24" fill="var(--c1)" opacity="0.95"/><circle cx="123.3" cy="71.9" r="2.27" fill="var(--c1)" opacity="0.96"/><circle cx="86.1" cy="128.4" r="2.28" fill="var(--c1)" opacity="0.97"/><circle cx="110.7" cy="126.0" r="2.29" fill="var(--c1)" opacity="0.97"/><circle cx="79.0" cy="113.9" r="2.31" fill="var(--c1)" opacity="0.98"/><circle cx="114.9" cy="80.3" r="2.32" fill="var(--c1)" opacity="0.98"/><circle cx="88.8" cy="80.2" r="2.32" fill="var(--c1)" opacity="0.99"/><circle cx="86.7" cy="97.5" r="2.34" fill="var(--c1)" opacity="1.00"/><circle cx="100.7" cy="89.6" r="2.34" fill="var(--c1)" opacity="1.00"/><circle cx="100.7" cy="108.8" r="2.35" fill="var(--c1)" opacity="1.00"/><circle cx="96.4" cy="103.4" r="2.35" fill="var(--c1)" opacity="1.00"/><circle cx="103.5" cy="97.7" r="2.35" fill="var(--c1)" opacity="1.00"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-WORKINGv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="1"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="1"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-WORKINGv2)" opacity="0"/>
+</g>
+
+<g id="layer-WAITINGv2" class="lyr lyr-WAITING" data-st="WAITING">
+  <defs>
+    <radialGradient id="plateGrad-WAITINGv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-WAITINGv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-WAITINGv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-WAITINGv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="95.5" cy="79.9" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="92.0" cy="127.6" r="0.89" fill="var(--c1)" opacity="0.28"/><circle cx="131.6" cy="108.6" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="63.6" cy="104.8" r="0.92" fill="var(--c1)" opacity="0.29"/><circle cx="122.0" cy="66.8" r="0.93" fill="var(--c1)" opacity="0.30"/><circle cx="92.8" cy="150.9" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="52.6" cy="74.8" r="1.00" fill="var(--c1)" opacity="0.33"/><circle cx="49.6" cy="97.5" r="1.01" fill="var(--c1)" opacity="0.34"/><circle cx="145.0" cy="62.6" r="1.04" fill="var(--c1)" opacity="0.36"/><circle cx="93.6" cy="33.1" r="1.17" fill="var(--c1)" opacity="0.42"/><circle cx="133.9" cy="44.7" r="1.19" fill="var(--c1)" opacity="0.43"/><circle cx="67.1" cy="157.8" r="1.22" fill="var(--c1)" opacity="0.44"/><circle cx="124.9" cy="30.0" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="146.4" cy="49.0" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="172.1" cy="134.7" r="1.28" fill="var(--c1)" opacity="0.47"/><circle cx="69.0" cy="22.4" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="186.0" cy="85.5" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="174.7" cy="130.9" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="148.6" cy="39.5" r="1.36" fill="var(--c1)" opacity="0.51"/><circle cx="162.9" cy="56.5" r="1.39" fill="var(--c1)" opacity="0.53"/><circle cx="167.6" cy="37.4" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="178.7" cy="75.6" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="188.9" cy="125.4" r="1.55" fill="var(--c1)" opacity="0.60"/><circle cx="37.9" cy="50.7" r="1.62" fill="var(--c1)" opacity="0.64"/><circle cx="48.8" cy="25.3" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="11.8" cy="97.5" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="16.0" cy="103.5" r="1.79" fill="var(--c1)" opacity="0.72"/><circle cx="179.6" cy="128.0" r="1.81" fill="var(--c1)" opacity="0.73"/><circle cx="49.1" cy="27.6" r="1.81" fill="var(--c1)" opacity="0.74"/><circle cx="153.7" cy="43.4" r="1.88" fill="var(--c1)" opacity="0.77"/><circle cx="31.6" cy="71.3" r="1.90" fill="var(--c1)" opacity="0.78"/><circle cx="120.2" cy="34.1" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="180.1" cy="133.7" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="124.9" cy="172.4" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="111.6" cy="168.2" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="34.3" cy="56.9" r="1.97" fill="var(--c1)" opacity="0.81"/><circle cx="34.0" cy="140.1" r="1.98" fill="var(--c1)" opacity="0.82"/><circle cx="82.3" cy="167.1" r="2.03" fill="var(--c1)" opacity="0.84"/><circle cx="67.5" cy="153.4" r="2.05" fill="var(--c1)" opacity="0.85"/><circle cx="48.7" cy="67.9" r="2.12" fill="var(--c1)" opacity="0.89"/><circle cx="96.2" cy="44.3" r="2.15" fill="var(--c1)" opacity="0.90"/><circle cx="134.3" cy="56.0" r="2.16" fill="var(--c1)" opacity="0.90"/><circle cx="39.3" cy="97.3" r="2.17" fill="var(--c1)" opacity="0.91"/><circle cx="148.6" cy="92.0" r="2.19" fill="var(--c1)" opacity="0.92"/><circle cx="127.8" cy="139.3" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="125.1" cy="69.7" r="2.27" fill="var(--c1)" opacity="0.96"/><circle cx="84.9" cy="130.9" r="2.28" fill="var(--c1)" opacity="0.97"/><circle cx="77.5" cy="114.9" r="2.31" fill="var(--c1)" opacity="0.98"/><circle cx="115.8" cy="79.1" r="2.32" fill="var(--c1)" opacity="0.98"/><circle cx="88.0" cy="78.9" r="2.32" fill="var(--c1)" opacity="0.99"/><circle cx="100.8" cy="88.8" r="2.34" fill="var(--c1)" opacity="1.00"/><circle cx="103.9" cy="97.5" r="2.35" fill="var(--c1)" opacity="1.00"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-WAITINGv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="0.55"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="0.55"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-WAITINGv2)" opacity="0"/>
+</g>
+
+<g id="layer-SUCCESSv2" class="lyr lyr-SUCCESS" data-st="SUCCESS">
+  <defs>
+    <radialGradient id="plateGrad-SUCCESSv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-SUCCESSv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-SUCCESSv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-SUCCESSv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="105.4" cy="116.0" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="100.3" cy="82.0" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="84.3" cy="82.7" r="0.88" fill="var(--c1)" opacity="0.27"/><circle cx="91.8" cy="81.7" r="0.88" fill="var(--c1)" opacity="0.28"/><circle cx="92.7" cy="71.0" r="0.90" fill="var(--c1)" opacity="0.28"/><circle cx="64.0" cy="112.1" r="0.92" fill="var(--c1)" opacity="0.30"/><circle cx="107.8" cy="61.1" r="0.94" fill="var(--c1)" opacity="0.30"/><circle cx="143.8" cy="83.5" r="0.96" fill="var(--c1)" opacity="0.31"/><circle cx="83.3" cy="134.1" r="0.96" fill="var(--c1)" opacity="0.31"/><circle cx="137.0" cy="73.8" r="0.98" fill="var(--c1)" opacity="0.32"/><circle cx="147.6" cy="122.5" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="65.5" cy="131.5" r="1.00" fill="var(--c1)" opacity="0.33"/><circle cx="101.9" cy="47.4" r="1.02" fill="var(--c1)" opacity="0.34"/><circle cx="74.9" cy="150.4" r="1.05" fill="var(--c1)" opacity="0.36"/><circle cx="71.2" cy="60.8" r="1.05" fill="var(--c1)" opacity="0.36"/><circle cx="108.6" cy="50.3" r="1.06" fill="var(--c1)" opacity="0.36"/><circle cx="54.0" cy="68.5" r="1.10" fill="var(--c1)" opacity="0.38"/><circle cx="112.4" cy="151.8" r="1.11" fill="var(--c1)" opacity="0.39"/><circle cx="43.8" cy="60.0" r="1.17" fill="var(--c1)" opacity="0.42"/><circle cx="64.1" cy="37.9" r="1.20" fill="var(--c1)" opacity="0.44"/><circle cx="94.6" cy="33.7" r="1.21" fill="var(--c1)" opacity="0.44"/><circle cx="158.7" cy="127.8" r="1.22" fill="var(--c1)" opacity="0.44"/><circle cx="162.9" cy="121.0" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="164.0" cy="75.8" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="51.7" cy="154.1" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="30.6" cy="98.3" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="109.6" cy="165.5" r="1.27" fill="var(--c1)" opacity="0.47"/><circle cx="105.5" cy="164.5" r="1.27" fill="var(--c1)" opacity="0.47"/><circle cx="140.5" cy="149.5" r="1.28" fill="var(--c1)" opacity="0.47"/><circle cx="172.4" cy="89.4" r="1.30" fill="var(--c1)" opacity="0.48"/><circle cx="177.6" cy="85.8" r="1.33" fill="var(--c1)" opacity="0.50"/><circle cx="165.5" cy="74.0" r="1.35" fill="var(--c1)" opacity="0.51"/><circle cx="147.4" cy="33.8" r="1.36" fill="var(--c1)" opacity="0.51"/><circle cx="176.1" cy="110.8" r="1.37" fill="var(--c1)" opacity="0.52"/><circle cx="70.7" cy="36.1" r="1.38" fill="var(--c1)" opacity="0.52"/><circle cx="28.9" cy="111.7" r="1.39" fill="var(--c1)" opacity="0.53"/><circle cx="186.4" cy="95.8" r="1.44" fill="var(--c1)" opacity="0.55"/><circle cx="155.6" cy="163.2" r="1.45" fill="var(--c1)" opacity="0.55"/><circle cx="154.0" cy="154.5" r="1.46" fill="var(--c1)" opacity="0.56"/><circle cx="107.0" cy="166.3" r="1.47" fill="var(--c1)" opacity="0.56"/><circle cx="158.9" cy="50.3" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="144.4" cy="40.2" r="1.48" fill="var(--c1)" opacity="0.57"/><circle cx="166.1" cy="125.5" r="1.48" fill="var(--c1)" opacity="0.57"/><circle cx="81.1" cy="165.6" r="1.50" fill="var(--c1)" opacity="0.58"/><circle cx="185.5" cy="91.2" r="1.57" fill="var(--c1)" opacity="0.62"/><circle cx="49.8" cy="33.9" r="1.57" fill="var(--c1)" opacity="0.62"/><circle cx="86.7" cy="28.6" r="1.59" fill="var(--c1)" opacity="0.63"/><circle cx="156.2" cy="156.5" r="1.61" fill="var(--c1)" opacity="0.63"/><circle cx="189.1" cy="116.9" r="1.61" fill="var(--c1)" opacity="0.64"/><circle cx="24.6" cy="92.0" r="1.63" fill="var(--c1)" opacity="0.64"/><circle cx="179.8" cy="66.5" r="1.63" fill="var(--c1)" opacity="0.64"/><circle cx="122.8" cy="176.7" r="1.65" fill="var(--c1)" opacity="0.65"/><circle cx="170.9" cy="76.8" r="1.67" fill="var(--c1)" opacity="0.66"/><circle cx="108.8" cy="170.5" r="1.70" fill="var(--c1)" opacity="0.68"/><circle cx="90.5" cy="23.0" r="1.73" fill="var(--c1)" opacity="0.69"/><circle cx="56.7" cy="43.8" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="177.8" cy="110.5" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="26.5" cy="96.3" r="1.79" fill="var(--c1)" opacity="0.72"/><circle cx="82.0" cy="24.7" r="1.81" fill="var(--c1)" opacity="0.74"/><circle cx="105.3" cy="18.5" r="1.83" fill="var(--c1)" opacity="0.74"/><circle cx="127.0" cy="26.7" r="1.83" fill="var(--c1)" opacity="0.74"/><circle cx="114.4" cy="175.0" r="1.84" fill="var(--c1)" opacity="0.75"/><circle cx="112.5" cy="164.6" r="1.86" fill="var(--c1)" opacity="0.76"/><circle cx="19.7" cy="117.6" r="1.87" fill="var(--c1)" opacity="0.76"/><circle cx="86.1" cy="22.0" r="1.88" fill="var(--c1)" opacity="0.77"/><circle cx="123.5" cy="175.2" r="1.90" fill="var(--c1)" opacity="0.78"/><circle cx="177.6" cy="71.6" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="129.8" cy="160.6" r="1.93" fill="var(--c1)" opacity="0.79"/><circle cx="109.5" cy="36.9" r="1.99" fill="var(--c1)" opacity="0.82"/><circle cx="145.0" cy="42.4" r="1.99" fill="var(--c1)" opacity="0.82"/><circle cx="120.3" cy="155.3" r="2.00" fill="var(--c1)" opacity="0.83"/><circle cx="157.4" cy="51.0" r="2.00" fill="var(--c1)" opacity="0.83"/><circle cx="79.9" cy="32.7" r="2.02" fill="var(--c1)" opacity="0.84"/><circle cx="143.9" cy="137.1" r="2.03" fill="var(--c1)" opacity="0.84"/><circle cx="33.9" cy="94.1" r="2.05" fill="var(--c1)" opacity="0.85"/><circle cx="111.7" cy="164.5" r="2.05" fill="var(--c1)" opacity="0.85"/><circle cx="149.8" cy="134.1" r="2.06" fill="var(--c1)" opacity="0.86"/><circle cx="171.7" cy="92.3" r="2.06" fill="var(--c1)" opacity="0.86"/><circle cx="92.3" cy="154.8" r="2.08" fill="var(--c1)" opacity="0.87"/><circle cx="39.2" cy="90.1" r="2.10" fill="var(--c1)" opacity="0.88"/><circle cx="68.9" cy="148.7" r="2.10" fill="var(--c1)" opacity="0.88"/><circle cx="95.8" cy="155.2" r="2.13" fill="var(--c1)" opacity="0.89"/><circle cx="149.4" cy="76.6" r="2.15" fill="var(--c1)" opacity="0.90"/><circle cx="49.5" cy="86.9" r="2.16" fill="var(--c1)" opacity="0.91"/><circle cx="60.8" cy="73.9" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="142.5" cy="85.4" r="2.22" fill="var(--c1)" opacity="0.94"/><circle cx="124.9" cy="60.3" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="118.5" cy="135.6" r="2.24" fill="var(--c1)" opacity="0.94"/><circle cx="63.4" cy="114.7" r="2.25" fill="var(--c1)" opacity="0.95"/><circle cx="76.5" cy="70.6" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="96.6" cy="128.4" r="2.29" fill="var(--c1)" opacity="0.97"/><circle cx="130.3" cy="103.3" r="2.30" fill="var(--c1)" opacity="0.98"/><circle cx="72.8" cy="101.6" r="2.31" fill="var(--c1)" opacity="0.98"/><circle cx="122.6" cy="90.1" r="2.32" fill="var(--c1)" opacity="0.98"/><circle cx="115.8" cy="112.3" r="2.33" fill="var(--c1)" opacity="0.99"/><circle cx="103.1" cy="110.8" r="2.34" fill="var(--c1)" opacity="1.00"/><circle cx="107.8" cy="91.6" r="2.34" fill="var(--c1)" opacity="1.00"/><circle cx="89.3" cy="103.7" r="2.34" fill="var(--c1)" opacity="1.00"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-SUCCESSv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="1"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="1"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-SUCCESSv2)" opacity="0"/>
+</g>
+
+<g id="layer-ERRORv2" class="lyr lyr-ERROR" data-st="ERROR">
+  <defs>
+    <radialGradient id="plateGrad-ERRORv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-ERRORv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-ERRORv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-ERRORv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="86.4" cy="109.0" r="0.86" fill="var(--c1)" opacity="0.27"/><circle cx="116.8" cy="121.0" r="0.89" fill="var(--c1)" opacity="0.28"/><circle cx="128.4" cy="89.9" r="0.92" fill="var(--c1)" opacity="0.29"/><circle cx="136.9" cy="102.0" r="0.93" fill="var(--c1)" opacity="0.30"/><circle cx="58.3" cy="93.5" r="0.95" fill="var(--c1)" opacity="0.31"/><circle cx="135.8" cy="85.8" r="0.97" fill="var(--c1)" opacity="0.32"/><circle cx="65.2" cy="80.8" r="0.97" fill="var(--c1)" opacity="0.32"/><circle cx="136.5" cy="81.2" r="0.97" fill="var(--c1)" opacity="0.32"/><circle cx="69.4" cy="127.9" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="92.3" cy="54.7" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="136.3" cy="130.4" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="101.9" cy="142.6" r="1.01" fill="var(--c1)" opacity="0.34"/><circle cx="139.7" cy="135.8" r="1.04" fill="var(--c1)" opacity="0.35"/><circle cx="97.9" cy="152.1" r="1.06" fill="var(--c1)" opacity="0.36"/><circle cx="155.6" cy="130.1" r="1.12" fill="var(--c1)" opacity="0.39"/><circle cx="109.2" cy="32.6" r="1.14" fill="var(--c1)" opacity="0.40"/><circle cx="35.9" cy="125.2" r="1.18" fill="var(--c1)" opacity="0.42"/><circle cx="155.4" cy="148.7" r="1.20" fill="var(--c1)" opacity="0.43"/><circle cx="152.0" cy="147.8" r="1.20" fill="var(--c1)" opacity="0.43"/><circle cx="107.3" cy="40.5" r="1.21" fill="var(--c1)" opacity="0.44"/><circle cx="161.8" cy="89.1" r="1.23" fill="var(--c1)" opacity="0.45"/><circle cx="165.6" cy="110.2" r="1.24" fill="var(--c1)" opacity="0.45"/><circle cx="112.8" cy="33.8" r="1.24" fill="var(--c1)" opacity="0.45"/><circle cx="162.9" cy="149.7" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="130.1" cy="36.8" r="1.30" fill="var(--c1)" opacity="0.48"/><circle cx="20.9" cy="101.4" r="1.30" fill="var(--c1)" opacity="0.48"/><circle cx="154.0" cy="140.9" r="1.32" fill="var(--c1)" opacity="0.49"/><circle cx="83.7" cy="177.8" r="1.33" fill="var(--c1)" opacity="0.49"/><circle cx="151.8" cy="49.2" r="1.42" fill="var(--c1)" opacity="0.54"/><circle cx="161.3" cy="62.0" r="1.42" fill="var(--c1)" opacity="0.54"/><circle cx="163.2" cy="128.9" r="1.43" fill="var(--c1)" opacity="0.55"/><circle cx="162.1" cy="41.8" r="1.44" fill="var(--c1)" opacity="0.55"/><circle cx="135.4" cy="166.8" r="1.45" fill="var(--c1)" opacity="0.56"/><circle cx="59.8" cy="170.7" r="1.48" fill="var(--c1)" opacity="0.57"/><circle cx="88.8" cy="28.5" r="1.49" fill="var(--c1)" opacity="0.58"/><circle cx="51.1" cy="39.3" r="1.49" fill="var(--c1)" opacity="0.58"/><circle cx="27.8" cy="113.2" r="1.51" fill="var(--c1)" opacity="0.59"/><circle cx="83.4" cy="172.5" r="1.53" fill="var(--c1)" opacity="0.59"/><circle cx="188.5" cy="95.5" r="1.54" fill="var(--c1)" opacity="0.60"/><circle cx="120.3" cy="167.1" r="1.55" fill="var(--c1)" opacity="0.61"/><circle cx="82.5" cy="27.0" r="1.61" fill="var(--c1)" opacity="0.63"/><circle cx="22.1" cy="142.3" r="1.63" fill="var(--c1)" opacity="0.64"/><circle cx="128.0" cy="27.1" r="1.63" fill="var(--c1)" opacity="0.65"/><circle cx="176.2" cy="119.0" r="1.64" fill="var(--c1)" opacity="0.65"/><circle cx="166.0" cy="146.6" r="1.64" fill="var(--c1)" opacity="0.65"/><circle cx="128.1" cy="30.4" r="1.67" fill="var(--c1)" opacity="0.67"/><circle cx="161.7" cy="56.0" r="1.69" fill="var(--c1)" opacity="0.67"/><circle cx="171.1" cy="80.3" r="1.69" fill="var(--c1)" opacity="0.67"/><circle cx="166.4" cy="71.6" r="1.69" fill="var(--c1)" opacity="0.68"/><circle cx="26.4" cy="139.0" r="1.70" fill="var(--c1)" opacity="0.68"/><circle cx="139.2" cy="157.8" r="1.72" fill="var(--c1)" opacity="0.69"/><circle cx="19.1" cy="102.4" r="1.73" fill="var(--c1)" opacity="0.69"/><circle cx="25.4" cy="65.7" r="1.74" fill="var(--c1)" opacity="0.70"/><circle cx="171.5" cy="106.5" r="1.77" fill="var(--c1)" opacity="0.71"/><circle cx="140.1" cy="159.7" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="77.8" cy="29.3" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="177.9" cy="117.8" r="1.80" fill="var(--c1)" opacity="0.73"/><circle cx="20.6" cy="73.4" r="1.81" fill="var(--c1)" opacity="0.73"/><circle cx="29.5" cy="136.7" r="1.82" fill="var(--c1)" opacity="0.74"/><circle cx="60.7" cy="45.8" r="1.83" fill="var(--c1)" opacity="0.74"/><circle cx="167.8" cy="91.1" r="1.87" fill="var(--c1)" opacity="0.76"/><circle cx="170.2" cy="77.6" r="1.87" fill="var(--c1)" opacity="0.76"/><circle cx="159.6" cy="138.4" r="1.90" fill="var(--c1)" opacity="0.78"/><circle cx="45.0" cy="136.1" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="130.8" cy="159.2" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="168.7" cy="75.0" r="1.93" fill="var(--c1)" opacity="0.79"/><circle cx="53.8" cy="152.9" r="1.93" fill="var(--c1)" opacity="0.79"/><circle cx="127.3" cy="170.6" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="71.0" cy="155.1" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="48.3" cy="58.8" r="1.95" fill="var(--c1)" opacity="0.80"/><circle cx="22.5" cy="86.3" r="1.96" fill="var(--c1)" opacity="0.81"/><circle cx="86.5" cy="160.3" r="1.97" fill="var(--c1)" opacity="0.81"/><circle cx="78.9" cy="44.6" r="1.99" fill="var(--c1)" opacity="0.82"/><circle cx="101.4" cy="36.2" r="2.02" fill="var(--c1)" opacity="0.84"/><circle cx="126.7" cy="158.1" r="2.02" fill="var(--c1)" opacity="0.84"/><circle cx="128.6" cy="47.0" r="2.02" fill="var(--c1)" opacity="0.84"/><circle cx="59.2" cy="57.9" r="2.08" fill="var(--c1)" opacity="0.86"/><circle cx="40.7" cy="106.8" r="2.09" fill="var(--c1)" opacity="0.87"/><circle cx="75.0" cy="145.9" r="2.09" fill="var(--c1)" opacity="0.87"/><circle cx="157.7" cy="92.0" r="2.12" fill="var(--c1)" opacity="0.89"/><circle cx="135.0" cy="54.7" r="2.13" fill="var(--c1)" opacity="0.89"/><circle cx="152.6" cy="80.3" r="2.15" fill="var(--c1)" opacity="0.90"/><circle cx="112.2" cy="152.6" r="2.17" fill="var(--c1)" opacity="0.91"/><circle cx="51.0" cy="116.0" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="148.3" cy="93.1" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="137.9" cy="73.1" r="2.22" fill="var(--c1)" opacity="0.93"/><circle cx="60.0" cy="109.4" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="65.0" cy="126.6" r="2.25" fill="var(--c1)" opacity="0.95"/><circle cx="129.6" cy="116.6" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="61.0" cy="95.3" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="89.2" cy="66.1" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="132.6" cy="108.8" r="2.28" fill="var(--c1)" opacity="0.97"/><circle cx="115.8" cy="75.6" r="2.30" fill="var(--c1)" opacity="0.98"/><circle cx="71.2" cy="97.7" r="2.30" fill="var(--c1)" opacity="0.98"/><circle cx="118.2" cy="109.4" r="2.32" fill="var(--c1)" opacity="0.98"/><circle cx="120.3" cy="106.3" r="2.33" fill="var(--c1)" opacity="0.99"/><circle cx="114.9" cy="94.9" r="2.34" fill="var(--c1)" opacity="0.99"/><circle cx="104.0" cy="95.2" r="2.35" fill="var(--c1)" opacity="1.00"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-ERRORv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="0.7"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="0.7"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-ERRORv2)" opacity="0"/>
+</g>
+
+<g id="layer-DISCONNECTEDv2" class="lyr lyr-DISCONNECTED" data-st="DISCONNECTED">
+  <defs>
+    <radialGradient id="plateGrad-DISCONNECTEDv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-DISCONNECTEDv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-DISCONNECTEDv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-DISCONNECTEDv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="81.6" cy="95.9" r="0.86" fill="var(--c1)" opacity="0.27"/><circle cx="94.9" cy="80.7" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="98.5" cy="131.3" r="0.90" fill="var(--c1)" opacity="0.29"/><circle cx="62.7" cy="96.2" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="103.6" cy="141.0" r="0.96" fill="var(--c1)" opacity="0.31"/><circle cx="50.9" cy="116.0" r="0.98" fill="var(--c1)" opacity="0.32"/><circle cx="149.2" cy="75.3" r="1.05" fill="var(--c1)" opacity="0.36"/><circle cx="117.3" cy="45.4" r="1.05" fill="var(--c1)" opacity="0.36"/><circle cx="40.8" cy="106.4" r="1.06" fill="var(--c1)" opacity="0.36"/><circle cx="166.9" cy="63.3" r="1.18" fill="var(--c1)" opacity="0.42"/><circle cx="121.6" cy="26.4" r="1.31" fill="var(--c1)" opacity="0.49"/><circle cx="36.7" cy="148.9" r="1.37" fill="var(--c1)" opacity="0.52"/><circle cx="158.0" cy="41.9" r="1.40" fill="var(--c1)" opacity="0.53"/><circle cx="116.8" cy="15.4" r="1.45" fill="var(--c1)" opacity="0.55"/><circle cx="89.0" cy="19.4" r="1.45" fill="var(--c1)" opacity="0.56"/><circle cx="20.2" cy="106.8" r="1.48" fill="var(--c1)" opacity="0.57"/><circle cx="191.7" cy="91.8" r="1.49" fill="var(--c1)" opacity="0.58"/><circle cx="162.6" cy="43.3" r="1.50" fill="var(--c1)" opacity="0.58"/><circle cx="93.4" cy="21.1" r="1.51" fill="var(--c1)" opacity="0.59"/><circle cx="93.1" cy="13.6" r="1.55" fill="var(--c1)" opacity="0.61"/><circle cx="141.0" cy="30.7" r="1.56" fill="var(--c1)" opacity="0.61"/><circle cx="129.0" cy="175.0" r="1.65" fill="var(--c1)" opacity="0.65"/><circle cx="54.7" cy="38.1" r="1.72" fill="var(--c1)" opacity="0.69"/><circle cx="107.4" cy="21.8" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="85.6" cy="27.1" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="151.3" cy="139.9" r="2.07" fill="var(--c1)" opacity="0.86"/><circle cx="164.7" cy="78.9" r="2.08" fill="var(--c1)" opacity="0.87"/><circle cx="33.4" cy="91.8" r="2.11" fill="var(--c1)" opacity="0.88"/><circle cx="135.5" cy="51.4" r="2.13" fill="var(--c1)" opacity="0.89"/><circle cx="80.9" cy="159.5" r="2.14" fill="var(--c1)" opacity="0.89"/><circle cx="146.0" cy="64.6" r="2.15" fill="var(--c1)" opacity="0.90"/><circle cx="82.7" cy="137.0" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="64.7" cy="107.8" r="2.29" fill="var(--c1)" opacity="0.97"/><circle cx="126.7" cy="113.9" r="2.31" fill="var(--c1)" opacity="0.98"/><circle cx="118.9" cy="120.2" r="2.31" fill="var(--c1)" opacity="0.98"/><circle cx="80.6" cy="116.3" r="2.32" fill="var(--c1)" opacity="0.98"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-DISCONNECTEDv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="0.2"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="0.2"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-DISCONNECTEDv2)" opacity="0"/>
+</g></g></svg></div>
+    <div class="hovw"><div id="hov">
+      <span class="r1"><b class="st">执行中 · Bash</b><span class="tok">128.4k</span></span>
+      <span class="r2"><span class="k">总进度</span> <span class="v" id="pct1">0%</span>
+        <span style="float:right"><span class="k">进程</span> <span class="v" id="proc">6 个进程</span></span></span>
+      <span class="bl2"><i class="bq"></i><i class="bs" id="hovbs"></i><i class="bt"></i><b class="bl" id="hovbl">0/29 步 · 3 会话</b></span>
+      <span class="r3" id="hovr3"></span>
+      <span class="h3">子代理 5 · 主代理 1 · 其中 2 个在跑</span>
+    </div></div>
+  </div></div>
+  <div class="side"><div class="desk lt">
+    <div class="iconw"><svg class="ico" id="ico2" viewBox="0 0 200 200" width="144" height="144" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg"><g>
+<g id="layer-IDLEv2" class="lyr lyr-IDLE" data-st="IDLE">
+  <defs>
+    <radialGradient id="plateGrad-IDLEv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-IDLEv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-IDLEv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-IDLEv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="73.4" cy="113.8" r="0.89" fill="var(--c1)" opacity="0.28"/><circle cx="78.5" cy="132.4" r="0.94" fill="var(--c1)" opacity="0.30"/><circle cx="63.4" cy="137.3" r="1.03" fill="var(--c1)" opacity="0.35"/><circle cx="99.4" cy="156.0" r="1.03" fill="var(--c1)" opacity="0.35"/><circle cx="138.9" cy="55.5" r="1.06" fill="var(--c1)" opacity="0.36"/><circle cx="43.4" cy="90.2" r="1.07" fill="var(--c1)" opacity="0.37"/><circle cx="96.6" cy="36.2" r="1.08" fill="var(--c1)" opacity="0.37"/><circle cx="64.8" cy="44.9" r="1.16" fill="var(--c1)" opacity="0.41"/><circle cx="63.1" cy="157.0" r="1.17" fill="var(--c1)" opacity="0.42"/><circle cx="172.3" cy="124.7" r="1.23" fill="var(--c1)" opacity="0.45"/><circle cx="175.0" cy="117.9" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="88.6" cy="29.6" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="178.4" cy="122.1" r="1.31" fill="var(--c1)" opacity="0.49"/><circle cx="138.8" cy="178.4" r="1.51" fill="var(--c1)" opacity="0.59"/><circle cx="18.3" cy="137.8" r="1.52" fill="var(--c1)" opacity="0.59"/><circle cx="52.7" cy="28.2" r="1.53" fill="var(--c1)" opacity="0.60"/><circle cx="131.7" cy="181.8" r="1.54" fill="var(--c1)" opacity="0.60"/><circle cx="192.6" cy="90.5" r="1.57" fill="var(--c1)" opacity="0.62"/><circle cx="141.5" cy="35.6" r="1.60" fill="var(--c1)" opacity="0.63"/><circle cx="150.2" cy="170.4" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="21.4" cy="120.5" r="1.72" fill="var(--c1)" opacity="0.69"/><circle cx="169.4" cy="160.3" r="1.72" fill="var(--c1)" opacity="0.69"/><circle cx="164.3" cy="59.1" r="1.87" fill="var(--c1)" opacity="0.76"/><circle cx="160.8" cy="137.4" r="1.95" fill="var(--c1)" opacity="0.80"/><circle cx="31.8" cy="123.0" r="2.01" fill="var(--c1)" opacity="0.83"/><circle cx="169.0" cy="93.2" r="2.02" fill="var(--c1)" opacity="0.84"/><circle cx="37.1" cy="120.4" r="2.05" fill="var(--c1)" opacity="0.85"/><circle cx="166.5" cy="87.7" r="2.06" fill="var(--c1)" opacity="0.86"/><circle cx="76.2" cy="46.9" r="2.10" fill="var(--c1)" opacity="0.88"/><circle cx="124.0" cy="154.8" r="2.16" fill="var(--c1)" opacity="0.91"/><circle cx="154.3" cy="111.1" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="74.8" cy="64.2" r="2.22" fill="var(--c1)" opacity="0.94"/><circle cx="143.3" cy="124.3" r="2.22" fill="var(--c1)" opacity="0.94"/><circle cx="80.6" cy="66.5" r="2.25" fill="var(--c1)" opacity="0.95"/><circle cx="92.6" cy="135.5" r="2.29" fill="var(--c1)" opacity="0.97"/><circle cx="110.1" cy="79.9" r="2.33" fill="var(--c1)" opacity="0.99"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-IDLEv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="0.13"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="0.13"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-IDLEv2)" opacity="0"/>
+</g>
+
+<g id="layer-THINKINGv2" class="lyr lyr-THINKING" data-st="THINKING">
+  <defs>
+    <radialGradient id="plateGrad-THINKINGv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-THINKINGv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-THINKINGv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-THINKINGv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="91.2" cy="114.4" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="88.8" cy="116.9" r="0.88" fill="var(--c1)" opacity="0.27"/><circle cx="121.1" cy="123.9" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="81.4" cy="124.6" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="124.6" cy="64.1" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="153.0" cy="105.4" r="1.05" fill="var(--c1)" opacity="0.36"/><circle cx="44.2" cy="88.1" r="1.07" fill="var(--c1)" opacity="0.37"/><circle cx="157.7" cy="71.0" r="1.09" fill="var(--c1)" opacity="0.38"/><circle cx="114.9" cy="155.7" r="1.11" fill="var(--c1)" opacity="0.39"/><circle cx="58.1" cy="142.2" r="1.12" fill="var(--c1)" opacity="0.39"/><circle cx="68.8" cy="45.7" r="1.14" fill="var(--c1)" opacity="0.40"/><circle cx="41.3" cy="131.7" r="1.16" fill="var(--c1)" opacity="0.41"/><circle cx="30.7" cy="67.9" r="1.18" fill="var(--c1)" opacity="0.42"/><circle cx="22.4" cy="88.8" r="1.21" fill="var(--c1)" opacity="0.44"/><circle cx="34.4" cy="139.4" r="1.23" fill="var(--c1)" opacity="0.45"/><circle cx="102.0" cy="164.3" r="1.24" fill="var(--c1)" opacity="0.45"/><circle cx="87.5" cy="35.0" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="61.5" cy="166.4" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="41.6" cy="58.9" r="1.27" fill="var(--c1)" opacity="0.47"/><circle cx="164.7" cy="137.8" r="1.30" fill="var(--c1)" opacity="0.48"/><circle cx="137.3" cy="36.9" r="1.35" fill="var(--c1)" opacity="0.51"/><circle cx="24.6" cy="99.5" r="1.41" fill="var(--c1)" opacity="0.54"/><circle cx="56.1" cy="30.1" r="1.43" fill="var(--c1)" opacity="0.55"/><circle cx="180.4" cy="62.7" r="1.43" fill="var(--c1)" opacity="0.55"/><circle cx="36.8" cy="141.4" r="1.51" fill="var(--c1)" opacity="0.58"/><circle cx="169.5" cy="57.1" r="1.51" fill="var(--c1)" opacity="0.58"/><circle cx="166.8" cy="59.4" r="1.53" fill="var(--c1)" opacity="0.60"/><circle cx="9.2" cy="113.0" r="1.55" fill="var(--c1)" opacity="0.61"/><circle cx="176.1" cy="114.3" r="1.58" fill="var(--c1)" opacity="0.62"/><circle cx="167.1" cy="153.7" r="1.59" fill="var(--c1)" opacity="0.63"/><circle cx="174.1" cy="139.8" r="1.60" fill="var(--c1)" opacity="0.63"/><circle cx="97.5" cy="187.8" r="1.62" fill="var(--c1)" opacity="0.64"/><circle cx="76.3" cy="29.4" r="1.62" fill="var(--c1)" opacity="0.64"/><circle cx="145.6" cy="161.0" r="1.69" fill="var(--c1)" opacity="0.68"/><circle cx="131.6" cy="33.3" r="1.70" fill="var(--c1)" opacity="0.68"/><circle cx="152.8" cy="34.1" r="1.72" fill="var(--c1)" opacity="0.69"/><circle cx="81.5" cy="16.8" r="1.76" fill="var(--c1)" opacity="0.71"/><circle cx="176.4" cy="113.7" r="1.80" fill="var(--c1)" opacity="0.73"/><circle cx="39.3" cy="142.9" r="1.80" fill="var(--c1)" opacity="0.73"/><circle cx="177.5" cy="96.4" r="1.83" fill="var(--c1)" opacity="0.75"/><circle cx="123.9" cy="33.8" r="1.85" fill="var(--c1)" opacity="0.75"/><circle cx="74.6" cy="166.9" r="1.86" fill="var(--c1)" opacity="0.76"/><circle cx="174.2" cy="59.6" r="1.88" fill="var(--c1)" opacity="0.77"/><circle cx="28.7" cy="90.2" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="109.0" cy="170.4" r="1.92" fill="var(--c1)" opacity="0.79"/><circle cx="155.9" cy="49.9" r="1.98" fill="var(--c1)" opacity="0.82"/><circle cx="159.5" cy="129.7" r="1.99" fill="var(--c1)" opacity="0.82"/><circle cx="163.7" cy="124.0" r="1.99" fill="var(--c1)" opacity="0.82"/><circle cx="109.2" cy="40.4" r="2.04" fill="var(--c1)" opacity="0.85"/><circle cx="129.2" cy="45.8" r="2.04" fill="var(--c1)" opacity="0.85"/><circle cx="106.0" cy="37.7" r="2.09" fill="var(--c1)" opacity="0.87"/><circle cx="106.0" cy="47.5" r="2.11" fill="var(--c1)" opacity="0.88"/><circle cx="135.4" cy="141.6" r="2.11" fill="var(--c1)" opacity="0.88"/><circle cx="50.4" cy="132.3" r="2.16" fill="var(--c1)" opacity="0.91"/><circle cx="58.2" cy="132.2" r="2.20" fill="var(--c1)" opacity="0.93"/><circle cx="146.9" cy="95.7" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="63.3" cy="65.2" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="51.2" cy="81.8" r="2.22" fill="var(--c1)" opacity="0.94"/><circle cx="73.8" cy="65.5" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="73.3" cy="131.6" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="139.8" cy="113.5" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="114.0" cy="135.5" r="2.27" fill="var(--c1)" opacity="0.96"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-THINKINGv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="0.42"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="0.42"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-THINKINGv2)" opacity="0"/>
+</g>
+
+<g id="layer-WORKINGv2" class="lyr lyr-WORKING" data-st="WORKING">
+  <defs>
+    <radialGradient id="plateGrad-WORKINGv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-WORKINGv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-WORKINGv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-WORKINGv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="94.3" cy="108.6" r="0.86" fill="var(--c1)" opacity="0.26"/><circle cx="98.1" cy="83.3" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="95.8" cy="81.3" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="92.4" cy="126.1" r="0.89" fill="var(--c1)" opacity="0.28"/><circle cx="129.0" cy="107.9" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="133.6" cy="107.5" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="66.3" cy="104.5" r="0.92" fill="var(--c1)" opacity="0.29"/><circle cx="131.1" cy="88.7" r="0.93" fill="var(--c1)" opacity="0.30"/><circle cx="120.5" cy="69.0" r="0.93" fill="var(--c1)" opacity="0.30"/><circle cx="63.2" cy="93.8" r="0.95" fill="var(--c1)" opacity="0.31"/><circle cx="60.4" cy="79.7" r="0.95" fill="var(--c1)" opacity="0.31"/><circle cx="65.0" cy="119.3" r="0.97" fill="var(--c1)" opacity="0.32"/><circle cx="93.2" cy="147.8" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="55.7" cy="76.4" r="1.00" fill="var(--c1)" opacity="0.33"/><circle cx="54.4" cy="97.7" r="1.01" fill="var(--c1)" opacity="0.34"/><circle cx="144.9" cy="71.0" r="1.04" fill="var(--c1)" opacity="0.35"/><circle cx="141.8" cy="65.3" r="1.04" fill="var(--c1)" opacity="0.36"/><circle cx="58.9" cy="57.8" r="1.12" fill="var(--c1)" opacity="0.39"/><circle cx="62.4" cy="49.0" r="1.15" fill="var(--c1)" opacity="0.41"/><circle cx="94.1" cy="38.2" r="1.17" fill="var(--c1)" opacity="0.42"/><circle cx="130.7" cy="49.9" r="1.19" fill="var(--c1)" opacity="0.43"/><circle cx="70.3" cy="152.2" r="1.22" fill="var(--c1)" opacity="0.44"/><circle cx="73.2" cy="45.8" r="1.23" fill="var(--c1)" opacity="0.45"/><circle cx="123.1" cy="35.1" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="141.8" cy="54.0" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="120.8" cy="41.7" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="167.1" cy="132.3" r="1.28" fill="var(--c1)" opacity="0.47"/><circle cx="70.6" cy="26.4" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="19.8" cy="85.5" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="181.3" cy="86.3" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="169.4" cy="128.7" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="32.0" cy="103.5" r="1.35" fill="var(--c1)" opacity="0.50"/><circle cx="144.5" cy="44.6" r="1.36" fill="var(--c1)" opacity="0.51"/><circle cx="156.9" cy="60.7" r="1.39" fill="var(--c1)" opacity="0.53"/><circle cx="159.6" cy="49.4" r="1.39" fill="var(--c1)" opacity="0.53"/><circle cx="21.7" cy="117.4" r="1.45" fill="var(--c1)" opacity="0.56"/><circle cx="164.0" cy="40.7" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="173.5" cy="60.3" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="171.9" cy="77.7" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="25.2" cy="117.9" r="1.51" fill="var(--c1)" opacity="0.59"/><circle cx="183.4" cy="123.8" r="1.55" fill="var(--c1)" opacity="0.60"/><circle cx="181.2" cy="64.1" r="1.60" fill="var(--c1)" opacity="0.63"/><circle cx="43.8" cy="55.4" r="1.62" fill="var(--c1)" opacity="0.64"/><circle cx="31.3" cy="138.9" r="1.63" fill="var(--c1)" opacity="0.65"/><circle cx="26.9" cy="107.8" r="1.65" fill="var(--c1)" opacity="0.65"/><circle cx="28.2" cy="100.6" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="58.4" cy="33.9" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="183.7" cy="119.0" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="51.7" cy="29.6" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="118.3" cy="177.4" r="1.68" fill="var(--c1)" opacity="0.67"/><circle cx="40.2" cy="152.3" r="1.70" fill="var(--c1)" opacity="0.68"/><circle cx="148.3" cy="33.3" r="1.70" fill="var(--c1)" opacity="0.68"/><circle cx="72.6" cy="173.6" r="1.71" fill="var(--c1)" opacity="0.68"/><circle cx="188.0" cy="94.4" r="1.77" fill="var(--c1)" opacity="0.71"/><circle cx="179.8" cy="133.6" r="1.77" fill="var(--c1)" opacity="0.72"/><circle cx="17.7" cy="97.7" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="22.6" cy="103.2" r="1.79" fill="var(--c1)" opacity="0.72"/><circle cx="173.8" cy="126.0" r="1.81" fill="var(--c1)" opacity="0.73"/><circle cx="51.8" cy="31.5" r="1.81" fill="var(--c1)" opacity="0.74"/><circle cx="170.4" cy="64.8" r="1.86" fill="var(--c1)" opacity="0.76"/><circle cx="149.5" cy="47.8" r="1.88" fill="var(--c1)" opacity="0.77"/><circle cx="17.5" cy="114.4" r="1.88" fill="var(--c1)" opacity="0.77"/><circle cx="38.0" cy="74.0" r="1.90" fill="var(--c1)" opacity="0.78"/><circle cx="118.2" cy="40.6" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="175.9" cy="131.9" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="123.2" cy="167.6" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="138.1" cy="157.0" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="110.6" cy="162.0" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="38.4" cy="59.6" r="1.97" fill="var(--c1)" opacity="0.81"/><circle cx="38.4" cy="137.4" r="1.98" fill="var(--c1)" opacity="0.82"/><circle cx="96.8" cy="39.1" r="1.98" fill="var(--c1)" opacity="0.82"/><circle cx="32.9" cy="107.7" r="2.01" fill="var(--c1)" opacity="0.83"/><circle cx="83.5" cy="162.5" r="2.03" fill="var(--c1)" opacity="0.84"/><circle cx="70.6" cy="148.3" r="2.05" fill="var(--c1)" opacity="0.85"/><circle cx="138.2" cy="138.8" r="2.07" fill="var(--c1)" opacity="0.86"/><circle cx="74.0" cy="54.5" r="2.12" fill="var(--c1)" opacity="0.89"/><circle cx="52.8" cy="70.5" r="2.12" fill="var(--c1)" opacity="0.89"/><circle cx="96.5" cy="48.6" r="2.15" fill="var(--c1)" opacity="0.90"/><circle cx="131.6" cy="59.5" r="2.16" fill="var(--c1)" opacity="0.90"/><circle cx="42.8" cy="97.4" r="2.17" fill="var(--c1)" opacity="0.91"/><circle cx="143.8" cy="92.8" r="2.19" fill="var(--c1)" opacity="0.92"/><circle cx="146.2" cy="114.4" r="2.19" fill="var(--c1)" opacity="0.92"/><circle cx="117.3" cy="56.8" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="59.8" cy="112.8" r="2.22" fill="var(--c1)" opacity="0.94"/><circle cx="97.3" cy="138.5" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="126.1" cy="136.9" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="140.4" cy="81.3" r="2.24" fill="var(--c1)" opacity="0.95"/><circle cx="123.3" cy="71.9" r="2.27" fill="var(--c1)" opacity="0.96"/><circle cx="86.1" cy="128.4" r="2.28" fill="var(--c1)" opacity="0.97"/><circle cx="110.7" cy="126.0" r="2.29" fill="var(--c1)" opacity="0.97"/><circle cx="79.0" cy="113.9" r="2.31" fill="var(--c1)" opacity="0.98"/><circle cx="114.9" cy="80.3" r="2.32" fill="var(--c1)" opacity="0.98"/><circle cx="88.8" cy="80.2" r="2.32" fill="var(--c1)" opacity="0.99"/><circle cx="86.7" cy="97.5" r="2.34" fill="var(--c1)" opacity="1.00"/><circle cx="100.7" cy="89.6" r="2.34" fill="var(--c1)" opacity="1.00"/><circle cx="100.7" cy="108.8" r="2.35" fill="var(--c1)" opacity="1.00"/><circle cx="96.4" cy="103.4" r="2.35" fill="var(--c1)" opacity="1.00"/><circle cx="103.5" cy="97.7" r="2.35" fill="var(--c1)" opacity="1.00"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-WORKINGv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="1"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="1"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-WORKINGv2)" opacity="0"/>
+</g>
+
+<g id="layer-WAITINGv2" class="lyr lyr-WAITING" data-st="WAITING">
+  <defs>
+    <radialGradient id="plateGrad-WAITINGv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-WAITINGv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-WAITINGv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-WAITINGv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="95.5" cy="79.9" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="92.0" cy="127.6" r="0.89" fill="var(--c1)" opacity="0.28"/><circle cx="131.6" cy="108.6" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="63.6" cy="104.8" r="0.92" fill="var(--c1)" opacity="0.29"/><circle cx="122.0" cy="66.8" r="0.93" fill="var(--c1)" opacity="0.30"/><circle cx="92.8" cy="150.9" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="52.6" cy="74.8" r="1.00" fill="var(--c1)" opacity="0.33"/><circle cx="49.6" cy="97.5" r="1.01" fill="var(--c1)" opacity="0.34"/><circle cx="145.0" cy="62.6" r="1.04" fill="var(--c1)" opacity="0.36"/><circle cx="93.6" cy="33.1" r="1.17" fill="var(--c1)" opacity="0.42"/><circle cx="133.9" cy="44.7" r="1.19" fill="var(--c1)" opacity="0.43"/><circle cx="67.1" cy="157.8" r="1.22" fill="var(--c1)" opacity="0.44"/><circle cx="124.9" cy="30.0" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="146.4" cy="49.0" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="172.1" cy="134.7" r="1.28" fill="var(--c1)" opacity="0.47"/><circle cx="69.0" cy="22.4" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="186.0" cy="85.5" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="174.7" cy="130.9" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="148.6" cy="39.5" r="1.36" fill="var(--c1)" opacity="0.51"/><circle cx="162.9" cy="56.5" r="1.39" fill="var(--c1)" opacity="0.53"/><circle cx="167.6" cy="37.4" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="178.7" cy="75.6" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="188.9" cy="125.4" r="1.55" fill="var(--c1)" opacity="0.60"/><circle cx="37.9" cy="50.7" r="1.62" fill="var(--c1)" opacity="0.64"/><circle cx="48.8" cy="25.3" r="1.66" fill="var(--c1)" opacity="0.66"/><circle cx="11.8" cy="97.5" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="16.0" cy="103.5" r="1.79" fill="var(--c1)" opacity="0.72"/><circle cx="179.6" cy="128.0" r="1.81" fill="var(--c1)" opacity="0.73"/><circle cx="49.1" cy="27.6" r="1.81" fill="var(--c1)" opacity="0.74"/><circle cx="153.7" cy="43.4" r="1.88" fill="var(--c1)" opacity="0.77"/><circle cx="31.6" cy="71.3" r="1.90" fill="var(--c1)" opacity="0.78"/><circle cx="120.2" cy="34.1" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="180.1" cy="133.7" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="124.9" cy="172.4" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="111.6" cy="168.2" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="34.3" cy="56.9" r="1.97" fill="var(--c1)" opacity="0.81"/><circle cx="34.0" cy="140.1" r="1.98" fill="var(--c1)" opacity="0.82"/><circle cx="82.3" cy="167.1" r="2.03" fill="var(--c1)" opacity="0.84"/><circle cx="67.5" cy="153.4" r="2.05" fill="var(--c1)" opacity="0.85"/><circle cx="48.7" cy="67.9" r="2.12" fill="var(--c1)" opacity="0.89"/><circle cx="96.2" cy="44.3" r="2.15" fill="var(--c1)" opacity="0.90"/><circle cx="134.3" cy="56.0" r="2.16" fill="var(--c1)" opacity="0.90"/><circle cx="39.3" cy="97.3" r="2.17" fill="var(--c1)" opacity="0.91"/><circle cx="148.6" cy="92.0" r="2.19" fill="var(--c1)" opacity="0.92"/><circle cx="127.8" cy="139.3" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="125.1" cy="69.7" r="2.27" fill="var(--c1)" opacity="0.96"/><circle cx="84.9" cy="130.9" r="2.28" fill="var(--c1)" opacity="0.97"/><circle cx="77.5" cy="114.9" r="2.31" fill="var(--c1)" opacity="0.98"/><circle cx="115.8" cy="79.1" r="2.32" fill="var(--c1)" opacity="0.98"/><circle cx="88.0" cy="78.9" r="2.32" fill="var(--c1)" opacity="0.99"/><circle cx="100.8" cy="88.8" r="2.34" fill="var(--c1)" opacity="1.00"/><circle cx="103.9" cy="97.5" r="2.35" fill="var(--c1)" opacity="1.00"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-WAITINGv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="0.55"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="0.55"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-WAITINGv2)" opacity="0"/>
+</g>
+
+<g id="layer-SUCCESSv2" class="lyr lyr-SUCCESS" data-st="SUCCESS">
+  <defs>
+    <radialGradient id="plateGrad-SUCCESSv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-SUCCESSv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-SUCCESSv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-SUCCESSv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="105.4" cy="116.0" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="100.3" cy="82.0" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="84.3" cy="82.7" r="0.88" fill="var(--c1)" opacity="0.27"/><circle cx="91.8" cy="81.7" r="0.88" fill="var(--c1)" opacity="0.28"/><circle cx="92.7" cy="71.0" r="0.90" fill="var(--c1)" opacity="0.28"/><circle cx="64.0" cy="112.1" r="0.92" fill="var(--c1)" opacity="0.30"/><circle cx="107.8" cy="61.1" r="0.94" fill="var(--c1)" opacity="0.30"/><circle cx="143.8" cy="83.5" r="0.96" fill="var(--c1)" opacity="0.31"/><circle cx="83.3" cy="134.1" r="0.96" fill="var(--c1)" opacity="0.31"/><circle cx="137.0" cy="73.8" r="0.98" fill="var(--c1)" opacity="0.32"/><circle cx="147.6" cy="122.5" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="65.5" cy="131.5" r="1.00" fill="var(--c1)" opacity="0.33"/><circle cx="101.9" cy="47.4" r="1.02" fill="var(--c1)" opacity="0.34"/><circle cx="74.9" cy="150.4" r="1.05" fill="var(--c1)" opacity="0.36"/><circle cx="71.2" cy="60.8" r="1.05" fill="var(--c1)" opacity="0.36"/><circle cx="108.6" cy="50.3" r="1.06" fill="var(--c1)" opacity="0.36"/><circle cx="54.0" cy="68.5" r="1.10" fill="var(--c1)" opacity="0.38"/><circle cx="112.4" cy="151.8" r="1.11" fill="var(--c1)" opacity="0.39"/><circle cx="43.8" cy="60.0" r="1.17" fill="var(--c1)" opacity="0.42"/><circle cx="64.1" cy="37.9" r="1.20" fill="var(--c1)" opacity="0.44"/><circle cx="94.6" cy="33.7" r="1.21" fill="var(--c1)" opacity="0.44"/><circle cx="158.7" cy="127.8" r="1.22" fill="var(--c1)" opacity="0.44"/><circle cx="162.9" cy="121.0" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="164.0" cy="75.8" r="1.25" fill="var(--c1)" opacity="0.46"/><circle cx="51.7" cy="154.1" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="30.6" cy="98.3" r="1.26" fill="var(--c1)" opacity="0.46"/><circle cx="109.6" cy="165.5" r="1.27" fill="var(--c1)" opacity="0.47"/><circle cx="105.5" cy="164.5" r="1.27" fill="var(--c1)" opacity="0.47"/><circle cx="140.5" cy="149.5" r="1.28" fill="var(--c1)" opacity="0.47"/><circle cx="172.4" cy="89.4" r="1.30" fill="var(--c1)" opacity="0.48"/><circle cx="177.6" cy="85.8" r="1.33" fill="var(--c1)" opacity="0.50"/><circle cx="165.5" cy="74.0" r="1.35" fill="var(--c1)" opacity="0.51"/><circle cx="147.4" cy="33.8" r="1.36" fill="var(--c1)" opacity="0.51"/><circle cx="176.1" cy="110.8" r="1.37" fill="var(--c1)" opacity="0.52"/><circle cx="70.7" cy="36.1" r="1.38" fill="var(--c1)" opacity="0.52"/><circle cx="28.9" cy="111.7" r="1.39" fill="var(--c1)" opacity="0.53"/><circle cx="186.4" cy="95.8" r="1.44" fill="var(--c1)" opacity="0.55"/><circle cx="155.6" cy="163.2" r="1.45" fill="var(--c1)" opacity="0.55"/><circle cx="154.0" cy="154.5" r="1.46" fill="var(--c1)" opacity="0.56"/><circle cx="107.0" cy="166.3" r="1.47" fill="var(--c1)" opacity="0.56"/><circle cx="158.9" cy="50.3" r="1.47" fill="var(--c1)" opacity="0.57"/><circle cx="144.4" cy="40.2" r="1.48" fill="var(--c1)" opacity="0.57"/><circle cx="166.1" cy="125.5" r="1.48" fill="var(--c1)" opacity="0.57"/><circle cx="81.1" cy="165.6" r="1.50" fill="var(--c1)" opacity="0.58"/><circle cx="185.5" cy="91.2" r="1.57" fill="var(--c1)" opacity="0.62"/><circle cx="49.8" cy="33.9" r="1.57" fill="var(--c1)" opacity="0.62"/><circle cx="86.7" cy="28.6" r="1.59" fill="var(--c1)" opacity="0.63"/><circle cx="156.2" cy="156.5" r="1.61" fill="var(--c1)" opacity="0.63"/><circle cx="189.1" cy="116.9" r="1.61" fill="var(--c1)" opacity="0.64"/><circle cx="24.6" cy="92.0" r="1.63" fill="var(--c1)" opacity="0.64"/><circle cx="179.8" cy="66.5" r="1.63" fill="var(--c1)" opacity="0.64"/><circle cx="122.8" cy="176.7" r="1.65" fill="var(--c1)" opacity="0.65"/><circle cx="170.9" cy="76.8" r="1.67" fill="var(--c1)" opacity="0.66"/><circle cx="108.8" cy="170.5" r="1.70" fill="var(--c1)" opacity="0.68"/><circle cx="90.5" cy="23.0" r="1.73" fill="var(--c1)" opacity="0.69"/><circle cx="56.7" cy="43.8" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="177.8" cy="110.5" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="26.5" cy="96.3" r="1.79" fill="var(--c1)" opacity="0.72"/><circle cx="82.0" cy="24.7" r="1.81" fill="var(--c1)" opacity="0.74"/><circle cx="105.3" cy="18.5" r="1.83" fill="var(--c1)" opacity="0.74"/><circle cx="127.0" cy="26.7" r="1.83" fill="var(--c1)" opacity="0.74"/><circle cx="114.4" cy="175.0" r="1.84" fill="var(--c1)" opacity="0.75"/><circle cx="112.5" cy="164.6" r="1.86" fill="var(--c1)" opacity="0.76"/><circle cx="19.7" cy="117.6" r="1.87" fill="var(--c1)" opacity="0.76"/><circle cx="86.1" cy="22.0" r="1.88" fill="var(--c1)" opacity="0.77"/><circle cx="123.5" cy="175.2" r="1.90" fill="var(--c1)" opacity="0.78"/><circle cx="177.6" cy="71.6" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="129.8" cy="160.6" r="1.93" fill="var(--c1)" opacity="0.79"/><circle cx="109.5" cy="36.9" r="1.99" fill="var(--c1)" opacity="0.82"/><circle cx="145.0" cy="42.4" r="1.99" fill="var(--c1)" opacity="0.82"/><circle cx="120.3" cy="155.3" r="2.00" fill="var(--c1)" opacity="0.83"/><circle cx="157.4" cy="51.0" r="2.00" fill="var(--c1)" opacity="0.83"/><circle cx="79.9" cy="32.7" r="2.02" fill="var(--c1)" opacity="0.84"/><circle cx="143.9" cy="137.1" r="2.03" fill="var(--c1)" opacity="0.84"/><circle cx="33.9" cy="94.1" r="2.05" fill="var(--c1)" opacity="0.85"/><circle cx="111.7" cy="164.5" r="2.05" fill="var(--c1)" opacity="0.85"/><circle cx="149.8" cy="134.1" r="2.06" fill="var(--c1)" opacity="0.86"/><circle cx="171.7" cy="92.3" r="2.06" fill="var(--c1)" opacity="0.86"/><circle cx="92.3" cy="154.8" r="2.08" fill="var(--c1)" opacity="0.87"/><circle cx="39.2" cy="90.1" r="2.10" fill="var(--c1)" opacity="0.88"/><circle cx="68.9" cy="148.7" r="2.10" fill="var(--c1)" opacity="0.88"/><circle cx="95.8" cy="155.2" r="2.13" fill="var(--c1)" opacity="0.89"/><circle cx="149.4" cy="76.6" r="2.15" fill="var(--c1)" opacity="0.90"/><circle cx="49.5" cy="86.9" r="2.16" fill="var(--c1)" opacity="0.91"/><circle cx="60.8" cy="73.9" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="142.5" cy="85.4" r="2.22" fill="var(--c1)" opacity="0.94"/><circle cx="124.9" cy="60.3" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="118.5" cy="135.6" r="2.24" fill="var(--c1)" opacity="0.94"/><circle cx="63.4" cy="114.7" r="2.25" fill="var(--c1)" opacity="0.95"/><circle cx="76.5" cy="70.6" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="96.6" cy="128.4" r="2.29" fill="var(--c1)" opacity="0.97"/><circle cx="130.3" cy="103.3" r="2.30" fill="var(--c1)" opacity="0.98"/><circle cx="72.8" cy="101.6" r="2.31" fill="var(--c1)" opacity="0.98"/><circle cx="122.6" cy="90.1" r="2.32" fill="var(--c1)" opacity="0.98"/><circle cx="115.8" cy="112.3" r="2.33" fill="var(--c1)" opacity="0.99"/><circle cx="103.1" cy="110.8" r="2.34" fill="var(--c1)" opacity="1.00"/><circle cx="107.8" cy="91.6" r="2.34" fill="var(--c1)" opacity="1.00"/><circle cx="89.3" cy="103.7" r="2.34" fill="var(--c1)" opacity="1.00"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-SUCCESSv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="1"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="1"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-SUCCESSv2)" opacity="0"/>
+</g>
+
+<g id="layer-ERRORv2" class="lyr lyr-ERROR" data-st="ERROR">
+  <defs>
+    <radialGradient id="plateGrad-ERRORv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-ERRORv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-ERRORv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-ERRORv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="86.4" cy="109.0" r="0.86" fill="var(--c1)" opacity="0.27"/><circle cx="116.8" cy="121.0" r="0.89" fill="var(--c1)" opacity="0.28"/><circle cx="128.4" cy="89.9" r="0.92" fill="var(--c1)" opacity="0.29"/><circle cx="136.9" cy="102.0" r="0.93" fill="var(--c1)" opacity="0.30"/><circle cx="58.3" cy="93.5" r="0.95" fill="var(--c1)" opacity="0.31"/><circle cx="135.8" cy="85.8" r="0.97" fill="var(--c1)" opacity="0.32"/><circle cx="65.2" cy="80.8" r="0.97" fill="var(--c1)" opacity="0.32"/><circle cx="136.5" cy="81.2" r="0.97" fill="var(--c1)" opacity="0.32"/><circle cx="69.4" cy="127.9" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="92.3" cy="54.7" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="136.3" cy="130.4" r="0.99" fill="var(--c1)" opacity="0.33"/><circle cx="101.9" cy="142.6" r="1.01" fill="var(--c1)" opacity="0.34"/><circle cx="139.7" cy="135.8" r="1.04" fill="var(--c1)" opacity="0.35"/><circle cx="97.9" cy="152.1" r="1.06" fill="var(--c1)" opacity="0.36"/><circle cx="155.6" cy="130.1" r="1.12" fill="var(--c1)" opacity="0.39"/><circle cx="109.2" cy="32.6" r="1.14" fill="var(--c1)" opacity="0.40"/><circle cx="35.9" cy="125.2" r="1.18" fill="var(--c1)" opacity="0.42"/><circle cx="155.4" cy="148.7" r="1.20" fill="var(--c1)" opacity="0.43"/><circle cx="152.0" cy="147.8" r="1.20" fill="var(--c1)" opacity="0.43"/><circle cx="107.3" cy="40.5" r="1.21" fill="var(--c1)" opacity="0.44"/><circle cx="161.8" cy="89.1" r="1.23" fill="var(--c1)" opacity="0.45"/><circle cx="165.6" cy="110.2" r="1.24" fill="var(--c1)" opacity="0.45"/><circle cx="112.8" cy="33.8" r="1.24" fill="var(--c1)" opacity="0.45"/><circle cx="162.9" cy="149.7" r="1.29" fill="var(--c1)" opacity="0.48"/><circle cx="130.1" cy="36.8" r="1.30" fill="var(--c1)" opacity="0.48"/><circle cx="20.9" cy="101.4" r="1.30" fill="var(--c1)" opacity="0.48"/><circle cx="154.0" cy="140.9" r="1.32" fill="var(--c1)" opacity="0.49"/><circle cx="83.7" cy="177.8" r="1.33" fill="var(--c1)" opacity="0.49"/><circle cx="151.8" cy="49.2" r="1.42" fill="var(--c1)" opacity="0.54"/><circle cx="161.3" cy="62.0" r="1.42" fill="var(--c1)" opacity="0.54"/><circle cx="163.2" cy="128.9" r="1.43" fill="var(--c1)" opacity="0.55"/><circle cx="162.1" cy="41.8" r="1.44" fill="var(--c1)" opacity="0.55"/><circle cx="135.4" cy="166.8" r="1.45" fill="var(--c1)" opacity="0.56"/><circle cx="59.8" cy="170.7" r="1.48" fill="var(--c1)" opacity="0.57"/><circle cx="88.8" cy="28.5" r="1.49" fill="var(--c1)" opacity="0.58"/><circle cx="51.1" cy="39.3" r="1.49" fill="var(--c1)" opacity="0.58"/><circle cx="27.8" cy="113.2" r="1.51" fill="var(--c1)" opacity="0.59"/><circle cx="83.4" cy="172.5" r="1.53" fill="var(--c1)" opacity="0.59"/><circle cx="188.5" cy="95.5" r="1.54" fill="var(--c1)" opacity="0.60"/><circle cx="120.3" cy="167.1" r="1.55" fill="var(--c1)" opacity="0.61"/><circle cx="82.5" cy="27.0" r="1.61" fill="var(--c1)" opacity="0.63"/><circle cx="22.1" cy="142.3" r="1.63" fill="var(--c1)" opacity="0.64"/><circle cx="128.0" cy="27.1" r="1.63" fill="var(--c1)" opacity="0.65"/><circle cx="176.2" cy="119.0" r="1.64" fill="var(--c1)" opacity="0.65"/><circle cx="166.0" cy="146.6" r="1.64" fill="var(--c1)" opacity="0.65"/><circle cx="128.1" cy="30.4" r="1.67" fill="var(--c1)" opacity="0.67"/><circle cx="161.7" cy="56.0" r="1.69" fill="var(--c1)" opacity="0.67"/><circle cx="171.1" cy="80.3" r="1.69" fill="var(--c1)" opacity="0.67"/><circle cx="166.4" cy="71.6" r="1.69" fill="var(--c1)" opacity="0.68"/><circle cx="26.4" cy="139.0" r="1.70" fill="var(--c1)" opacity="0.68"/><circle cx="139.2" cy="157.8" r="1.72" fill="var(--c1)" opacity="0.69"/><circle cx="19.1" cy="102.4" r="1.73" fill="var(--c1)" opacity="0.69"/><circle cx="25.4" cy="65.7" r="1.74" fill="var(--c1)" opacity="0.70"/><circle cx="171.5" cy="106.5" r="1.77" fill="var(--c1)" opacity="0.71"/><circle cx="140.1" cy="159.7" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="77.8" cy="29.3" r="1.78" fill="var(--c1)" opacity="0.72"/><circle cx="177.9" cy="117.8" r="1.80" fill="var(--c1)" opacity="0.73"/><circle cx="20.6" cy="73.4" r="1.81" fill="var(--c1)" opacity="0.73"/><circle cx="29.5" cy="136.7" r="1.82" fill="var(--c1)" opacity="0.74"/><circle cx="60.7" cy="45.8" r="1.83" fill="var(--c1)" opacity="0.74"/><circle cx="167.8" cy="91.1" r="1.87" fill="var(--c1)" opacity="0.76"/><circle cx="170.2" cy="77.6" r="1.87" fill="var(--c1)" opacity="0.76"/><circle cx="159.6" cy="138.4" r="1.90" fill="var(--c1)" opacity="0.78"/><circle cx="45.0" cy="136.1" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="130.8" cy="159.2" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="168.7" cy="75.0" r="1.93" fill="var(--c1)" opacity="0.79"/><circle cx="53.8" cy="152.9" r="1.93" fill="var(--c1)" opacity="0.79"/><circle cx="127.3" cy="170.6" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="71.0" cy="155.1" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="48.3" cy="58.8" r="1.95" fill="var(--c1)" opacity="0.80"/><circle cx="22.5" cy="86.3" r="1.96" fill="var(--c1)" opacity="0.81"/><circle cx="86.5" cy="160.3" r="1.97" fill="var(--c1)" opacity="0.81"/><circle cx="78.9" cy="44.6" r="1.99" fill="var(--c1)" opacity="0.82"/><circle cx="101.4" cy="36.2" r="2.02" fill="var(--c1)" opacity="0.84"/><circle cx="126.7" cy="158.1" r="2.02" fill="var(--c1)" opacity="0.84"/><circle cx="128.6" cy="47.0" r="2.02" fill="var(--c1)" opacity="0.84"/><circle cx="59.2" cy="57.9" r="2.08" fill="var(--c1)" opacity="0.86"/><circle cx="40.7" cy="106.8" r="2.09" fill="var(--c1)" opacity="0.87"/><circle cx="75.0" cy="145.9" r="2.09" fill="var(--c1)" opacity="0.87"/><circle cx="157.7" cy="92.0" r="2.12" fill="var(--c1)" opacity="0.89"/><circle cx="135.0" cy="54.7" r="2.13" fill="var(--c1)" opacity="0.89"/><circle cx="152.6" cy="80.3" r="2.15" fill="var(--c1)" opacity="0.90"/><circle cx="112.2" cy="152.6" r="2.17" fill="var(--c1)" opacity="0.91"/><circle cx="51.0" cy="116.0" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="148.3" cy="93.1" r="2.21" fill="var(--c1)" opacity="0.93"/><circle cx="137.9" cy="73.1" r="2.22" fill="var(--c1)" opacity="0.93"/><circle cx="60.0" cy="109.4" r="2.23" fill="var(--c1)" opacity="0.94"/><circle cx="65.0" cy="126.6" r="2.25" fill="var(--c1)" opacity="0.95"/><circle cx="129.6" cy="116.6" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="61.0" cy="95.3" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="89.2" cy="66.1" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="132.6" cy="108.8" r="2.28" fill="var(--c1)" opacity="0.97"/><circle cx="115.8" cy="75.6" r="2.30" fill="var(--c1)" opacity="0.98"/><circle cx="71.2" cy="97.7" r="2.30" fill="var(--c1)" opacity="0.98"/><circle cx="118.2" cy="109.4" r="2.32" fill="var(--c1)" opacity="0.98"/><circle cx="120.3" cy="106.3" r="2.33" fill="var(--c1)" opacity="0.99"/><circle cx="114.9" cy="94.9" r="2.34" fill="var(--c1)" opacity="0.99"/><circle cx="104.0" cy="95.2" r="2.35" fill="var(--c1)" opacity="1.00"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-ERRORv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="0.7"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="0.7"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-ERRORv2)" opacity="0"/>
+</g>
+
+<g id="layer-DISCONNECTEDv2" class="lyr lyr-DISCONNECTED" data-st="DISCONNECTED">
+  <defs>
+    <radialGradient id="plateGrad-DISCONNECTEDv2">
+      <stop offset="0%" stop-color="#050809" stop-opacity=".86"/>
+      <stop offset="82%" stop-color="#050809" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="flashGrad-DISCONNECTEDv2">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity=".95"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".35"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="burstGrad-DISCONNECTEDv2">
+      <stop offset="0%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="72%" stop-color="var(--c1)" stop-opacity="0"/>
+      <stop offset="88%" stop-color="var(--c1)" stop-opacity=".85"/>
+      <stop offset="100%" stop-color="var(--c1)" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <circle class="plate" cx="100" cy="100" r="97" fill="url(#plateGrad-DISCONNECTEDv2)"/>
+  <circle class="tick" cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g class="cloud"><circle cx="81.6" cy="95.9" r="0.86" fill="var(--c1)" opacity="0.27"/><circle cx="94.9" cy="80.7" r="0.87" fill="var(--c1)" opacity="0.27"/><circle cx="98.5" cy="131.3" r="0.90" fill="var(--c1)" opacity="0.29"/><circle cx="62.7" cy="96.2" r="0.91" fill="var(--c1)" opacity="0.29"/><circle cx="103.6" cy="141.0" r="0.96" fill="var(--c1)" opacity="0.31"/><circle cx="50.9" cy="116.0" r="0.98" fill="var(--c1)" opacity="0.32"/><circle cx="149.2" cy="75.3" r="1.05" fill="var(--c1)" opacity="0.36"/><circle cx="117.3" cy="45.4" r="1.05" fill="var(--c1)" opacity="0.36"/><circle cx="40.8" cy="106.4" r="1.06" fill="var(--c1)" opacity="0.36"/><circle cx="166.9" cy="63.3" r="1.18" fill="var(--c1)" opacity="0.42"/><circle cx="121.6" cy="26.4" r="1.31" fill="var(--c1)" opacity="0.49"/><circle cx="36.7" cy="148.9" r="1.37" fill="var(--c1)" opacity="0.52"/><circle cx="158.0" cy="41.9" r="1.40" fill="var(--c1)" opacity="0.53"/><circle cx="116.8" cy="15.4" r="1.45" fill="var(--c1)" opacity="0.55"/><circle cx="89.0" cy="19.4" r="1.45" fill="var(--c1)" opacity="0.56"/><circle cx="20.2" cy="106.8" r="1.48" fill="var(--c1)" opacity="0.57"/><circle cx="191.7" cy="91.8" r="1.49" fill="var(--c1)" opacity="0.58"/><circle cx="162.6" cy="43.3" r="1.50" fill="var(--c1)" opacity="0.58"/><circle cx="93.4" cy="21.1" r="1.51" fill="var(--c1)" opacity="0.59"/><circle cx="93.1" cy="13.6" r="1.55" fill="var(--c1)" opacity="0.61"/><circle cx="141.0" cy="30.7" r="1.56" fill="var(--c1)" opacity="0.61"/><circle cx="129.0" cy="175.0" r="1.65" fill="var(--c1)" opacity="0.65"/><circle cx="54.7" cy="38.1" r="1.72" fill="var(--c1)" opacity="0.69"/><circle cx="107.4" cy="21.8" r="1.91" fill="var(--c1)" opacity="0.78"/><circle cx="85.6" cy="27.1" r="1.94" fill="var(--c1)" opacity="0.80"/><circle cx="151.3" cy="139.9" r="2.07" fill="var(--c1)" opacity="0.86"/><circle cx="164.7" cy="78.9" r="2.08" fill="var(--c1)" opacity="0.87"/><circle cx="33.4" cy="91.8" r="2.11" fill="var(--c1)" opacity="0.88"/><circle cx="135.5" cy="51.4" r="2.13" fill="var(--c1)" opacity="0.89"/><circle cx="80.9" cy="159.5" r="2.14" fill="var(--c1)" opacity="0.89"/><circle cx="146.0" cy="64.6" r="2.15" fill="var(--c1)" opacity="0.90"/><circle cx="82.7" cy="137.0" r="2.26" fill="var(--c1)" opacity="0.96"/><circle cx="64.7" cy="107.8" r="2.29" fill="var(--c1)" opacity="0.97"/><circle cx="126.7" cy="113.9" r="2.31" fill="var(--c1)" opacity="0.98"/><circle cx="118.9" cy="120.2" r="2.31" fill="var(--c1)" opacity="0.98"/><circle cx="80.6" cy="116.3" r="2.32" fill="var(--c1)" opacity="0.98"/></g>
+
+  <g class="seg base">
+    <circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2"
+            stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== 进度环（本原型的唯一新增几何） ===== -->
+  <g class="prog outer progv2">
+    <circle class="ptrack" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)" stroke-opacity=".16"
+            stroke-width="2.4" stroke-dasharray="552.9" stroke-dashoffset="0" transform="rotate(-90 100 100)"/>
+    <circle class="pfill" cx="100" cy="100" r="88" fill="none" stroke="var(--c1)"
+            stroke-width="2.4" stroke-linecap="butt" stroke-dasharray="0 552.9" stroke-dashoffset="0"
+            transform="rotate(-90 100 100)"/>
+    <circle class="pmark" cx="100" cy="100" r="88" fill="none" stroke="#ffc266" stroke-width="3.0"
+            stroke-dasharray="1.6 551.3" stroke-dashoffset="0" opacity="0"/>
+    <g class="prun"><circle cx="100" cy="12.0" r="3.24" fill="#e8f0fa"/></g>
+  </g>
+
+  <circle class="inner" cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"/>
+  <circle class="glow glowA" cx="100" cy="100" r="44" fill="var(--c1)"/>
+  <circle class="glow glowB" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0"/>
+
+  <!-- 完成态：收束 → 爆散（三件都是静态几何 + transform/opacity） -->
+  <g class="burstg">
+    <circle class="burstring" cx="100" cy="100" r="34" fill="none" stroke="var(--c1)" stroke-width="2" opacity="0"/>
+    <circle class="bursthalo" cx="100" cy="100" r="34" fill="url(#burstGrad-DISCONNECTEDv2)" opacity="0"/>
+    <circle class="burstcore" cx="100" cy="100" r="26" fill="var(--c1)" opacity="0"/>
+  </g>
+
+  <g class="core">
+    <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6"
+          stroke-linejoin="round" opacity="0.2"/>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="0.2"/>
+  </g>
+  <circle class="flash" cx="100" cy="100" r="62" fill="url(#flashGrad-DISCONNECTEDv2)" opacity="0"/>
+</g></g></svg></div>
+    <div class="hovw" style="top:196px"><div style="width:272px;padding:5px 7px;border-radius:5px;background:rgba(16,30,47,.86);border:1px solid rgba(74,127,168,.85);font-family:ui-monospace,Consolas,monospace">
+      <span class="r1" style="display:block;height:15px;line-height:15px;font-size:12.5px;font-weight:700;color:#f4f8fa">浅色桌面下的同一枚图标</span>
+      <span style="display:block;height:13px;line-height:13px;font-size:9.5px;color:#bcd0dd">用来看"环在白底上还立不立得住"</span>
+    </div></div>
+    <div class="panw" id="panw"><div id="pan">
+      <div class="ph2">CONVERSATIONS · 3<span class="he">总 <b id="pct2">0%</b></span></div>
+      <div class="sess">
+        <div class="srow">主代理 · 当前对话<span class="agg" id="sn-main">0/6 步 · 0%</span></div>
+        <span class="sbar"><i class="sq"></i><i class="sf" id="sf-main"></i><i class="sm" id="sm-main"></i></span>
+      </div>
+      <div class="sess">
+        <div class="srow">reviewer<span class="agg" id="sn-reviewer">0/12 步 · 0%</span></div>
+        <span class="sbar"><i class="sq"></i><i class="sf" id="sf-reviewer"></i><i class="sm" id="sm-reviewer"></i></span>
+      </div>
+      <div class="sess">
+        <div class="srow">tester<span class="agg" id="sn-tester">0/11 步 · 0%</span></div>
+        <span class="sbar"><i class="sq"></i><i class="sf" id="sf-tester"></i><i class="sm" id="sm-tester"></i></span>
+      </div>
+      <div class="plan">计划已更新 6→11 —— 总进度因此回退（悬浮层里有说明）</div>
+      <div class="tree2"><div class="trow"><span class="tw">主代理 · 当前对话</span><span class="tail">6 步 · 04:12 · 41 工具</span></div><div class="trow d1"><span class="tw">├ researcher</span><i class="ic run"></i><span class="tail">02:14 · 17 工具</span></div><div class="trow d1"><span class="tw">├ engineer</span><i class="ic run"></i><span class="tail">01:03 · 9 工具</span></div><div class="trow d2"><span class="tw">│ └ verifier</span><i class="ic done"></i><span class="tail">04:41 · 31 工具</span></div><div class="trow d1"><span class="tw">├ reviewer</span><i class="ic done"></i><span class="tail">06:12 · 22 工具</span></div><div class="trow d2"><span class="tw">│ └ tester</span><i class="ic wait"></i><span class="tail">00:38 · 4 工具</span></div></div>
+      <div class="foot">子代理不给百分比（协议里没有单节点进度）：只给 状态 + 时长 + 工具数。<br>环上那颗白点是"运行体"，沿环走到当前进度；琥珀短刻度标在"上一次计划变更"的位置。</div>
+    </div></div>
+  </div>
+</div>
+<div class="cap">
+  <h3>v2 · 最外圈另起一层（r=88） <span class="ref">真实资产：base-h2 七层几何 + 七态配色 + 粒子种子，全部只读复制自 runtime/electron/index.html</span></h3>
+  <div><span class="k">设计意图</span>在最外圈另加一条进度环（r=88，夹在 tick 刻度环 r=94 与分段弧 r=60 之间），现有分段弧保持原样自转。</div>
+  <div style="margin-top:6px"><span class="k">优点</span><ul><li>真正"套在最外圈"：半径 88 = 图标半径的 88%，紧贴 tick 刻度环内缘，视觉上是一道箍</li><li>现有弧、云核、核心全部保持原样 —— <b>常态动感一点不损失</b>（云核 + 分段弧继续各自自转）</li><li>进度与装饰分离：环读进度、弧读"在动"，两件事互不干扰</li><li>stroke-width 2.4 更清楚，140px 下约 1.7px</li></ul></div>
+  <div style="margin-top:6px"><span class="k">代价 / 短板</span><ul><li>新增 3 个图元（track / fill / runner）→ 每层多 3 个节点 ×7 态 = 21 个，元素数 +约 2%</li><li>r=88 到 tick 环 r=94 之间只剩 6 单位空隙，轮廓上略紧（可以被 runner 圆点填掉）</li></ul></div>
+  <div style="margin-top:6px"><span class="k">不推荐的组合</span>不要同时把"完成爆散"缩小改成径向渐变扩散 —— 会变成第二套视觉语言。</div>
+  <div style="margin-top:6px"><span class="k">零件可换性</span><table><tr><th>零件</th><th>是什么</th><th>可换性</th></tr><tr><td>B 外圈环</td><td>r=88 新增 track + fill</td><td>可换半径：84（更贴内）/ 90（更贴 tick 环）；可换 stroke-width 1.6~3</td></tr>
+   <tr><td>C 三态</td><td>推进 / 完成（收束+爆散）/ 静止呼吸</td><td>与 A、B 都正交，两版共用</td></tr>
+   <tr><td>D 运行体</td><td>沿环走动的白点（rotate 驱动）</td><td>可换：小三角／短弧拖尾／去掉只剩填充</td></tr>
+   <tr><td>E 计划变更刻度</td><td>琥珀短刻度 + 悬浮层文字说明</td><td>可换：换成整环闪一下 / 换成环色变琥珀 1.5s</td></tr></table></div>
+  <div><span class="k">三态</span><b>推进</b>＝填充增长 + 运行体沿环走；<b>完成</b>＝环补满 → 收束（0~38%）→ <b>爆散</b>（38~100%，外环扩散 + 光晕 + 核心脉冲）；<b>静止呼吸</b>＝空闲态，省电档下完全静止</div>
+  <div><span class="k">三档</span>省电 4 fps / 空闲自转关闭 / 不爆散｜标准 15 fps / 自转 18s 一圈 / 慢呼吸｜流畅 30 fps / 自转 6s 一圈 —— 与 runtime <code>FPS_PRESETS</code>（idle 4/15/30）同口径</div>
+  <div><span class="k">尺寸参照</span>主图标 144px（viewBox 0 0 200 200，产品默认 svg=144；140px 是同一套几何按比例缩放）｜悬浮层 272 宽（抄 runtime <code>#v2hover</code> 口径）｜完整面板 440 宽（抄 <code>--panel-w</code>）</div>
+  <div><span class="k">实测 CPU（单核占比）</span>
+   <table><tr><th>档位</th><th>空闲（静止呼吸，不画环）</th><th>推进中</th><th>完成（收束+爆散）</th><th>三次实测中位数</th></tr>
+    <tr><td>省电 4 fps（不自转 · 不呼吸 · 不爆散）</td><td>1.7%</td><td>1.8%</td><td>1.8%</td><td>v1 1.66 / 1.78 / 1.85 / 1.79 ｜ v2 1.75 / 1.77 / 1.76 / 1.78</td></tr>
+    <tr><td>标准 15 fps（自转 18s/圈 · 慢呼吸）</td><td>5.2%</td><td>4.2%</td><td>4.3%</td><td>v1 5.19 / 4.17 / 4.37 / 4.27 ｜ v2 5.57 / 6.23 / 6.24 / 6.61</td></tr>
+    <tr><td>流畅 30 fps（自转 6s/圈）</td><td>5.9%</td><td>5.3%</td><td>5.2%</td><td>v1 5.86 / 5.27 / 5.34 / 5.19 ｜ v2 6.84 / 14.56⚠ / 9.42 / 8.31</td></tr>
+    <tr><td>基线：暂停（整页完全静止）</td><td colspan="3">0.02%</td><td>0.01 / 0.02 / 0.02</td></tr>
+   </table>
+   口径：本机 20 逻辑核；CDP <code>Performance.getMetrics</code> 的 TaskDuration ÷ 采样时长；<b>无头 Edge、1260×1000 视口、<span style="color:#ffc266">单页同时渲染 2 枚图标</span>（本原型为对照方便，深色 + 浅色桌面各一枚）、每格 12s、3 次取中位数</b>。
+   其中 v2 流畅/推进那次 15.72% 是机器负载尖峰（同格另外两次 14.56 与 8.60），<b>不要把它当真实成本</b>。</div>
+  <div><span class="k">数字怎么读</span>① <b>省电档 1.7~1.8% ≈ 基线</b>：空闲时环不画、云核不自转、不呼吸 → 这就是"省电档空闲时必须完全静止"落到数字上的样子；② 标准档比省电档贵约 <b>2.3 倍</b>，流畅档比标准档再贵约 <b>1.3 倍</b>（不是 2 倍，因为按时钟频率跳帧后每帧工作量固定，30fps 只有 2 倍而不是 7.5 倍的写 DOM 次数，瓶颈在光栅化）；③ 成本几乎全在 <b>layout + 重算样式</b>（各档 script 只有 30~260ms，layout 有 33~288ms）；④ 真实产品里只有 1 枚图标，上述数字可近似减半。</div>
+  <div><span class="k">机器验证</span>tick 递增 ✅｜#jserr 为空 ✅｜主元素 computed transform 逐帧变化（v1 是 .prun 运行体，v2 还有 .cloud/.seg 自转）✅｜环填充 stroke-dasharray 随之变化 ✅｜<b>三档 tick/3s = 12 / 40 / 80（对应 4/15/30 fps）</b> ✅｜空闲态：省电档云核与现有弧<b>完全冻结</b>、标准/流畅档按档位自转 ✅｜静态合规：computed 全量扫描 0 处 backdrop-filter / filter / box-shadow ✅</div>
+</div>
+<script>
+var V1 = false
+/* ---------- 探针（与上一批同一套口径） ---------- */
+window.onerror = function (m, f, l) {
+  try {
+    var d = document.getElementById('jserr')
+    if (!d) { d = document.createElement('div'); d.id = 'jserr'; document.body.appendChild(d) }
+    d.textContent = 'JSERR:' + m + '@' + l
+    document.body.setAttribute('data-jserr', String(m))
+  } catch (e) {}
+}
+var TICKS = 0
+function paintProbe () {
+  try {
+    document.body.setAttribute('data-ticks', String(TICKS))
+    document.body.setAttribute('data-fpstier', TIER)
+    document.body.setAttribute('data-state', STATE)
+    document.body.setAttribute('data-p', P.toFixed(4))
+    document.body.setAttribute('data-run', RUNNER_DEG.toFixed(2))
+    document.body.setAttribute('data-fps', String(TIERS[TIER].fps))
+    var sel = '.lyr-' + curSt
+    var rn = document.querySelector(sel + ' .prun')
+    document.body.setAttribute('data-runtf', rn ? (rn.style.transform || 'none') : 'missing')
+    var sg2 = document.querySelector(sel + ' .seg')
+    document.body.setAttribute('data-segtf', sg2 ? (sg2.style.transform || 'none') : 'none')
+    var el = document.getElementById('probe')
+    if (el) el.innerHTML = 'ticks <b>' + TICKS + '</b> · tier <b>' + TIER + '</b> · state <b>' + STATE +
+      '</b> · p <b>' + P.toFixed(3) + '</b> · runner <b>' + RUNNER_DEG.toFixed(1) + '°</b>'
+    var er = document.getElementById('jserr')
+    var e2 = (er && er.textContent) ? er.textContent : ''
+    document.title = 't=' + TICKS + '|' + TIER + '|' + STATE + '|p=' + P.toFixed(3) + '|err=' + (e2 || 'none')
+  } catch (e) {}
+}
+
+/* ---------- 三档：与 runtime FPS_PRESETS 同一口径（idle 4 / 15 / 30） ---------- */
+var TIERS = {
+  eco:      { fps: 4,  spin: 0,   breath: false, burst: false, idleSpin: 0,  name: '省电' },
+  standard: { fps: 15, spin: 18,  breath: true,  burst: true,  idleSpin: 60, name: '标准' },
+  smooth:   { fps: 30, spin: 6,   breath: true,  burst: true,  idleSpin: 24, name: '流畅' }
+}
+var TIER = 'standard', PLAYING = true, FROZEN = false
+var STATE = 'advance', P = 0, WANT_P = 0, T = 0, ANG = 0, RUNNER_DEG = 0
+var BACK_AT = -1, BACK_SHOWN = false
+var V1 = /v1/.test(location.pathname), PANEL = true
+var PIN = (location.search.match(/[?&]pin=([a-z0-9.]+)/) || [])[1] || ''
+var pinApplied = ''
+var PINP = (location.search.match(/[?&]p=([0-9.]+)/) || [])[1]
+
+var STATES = ['IDLE', 'THINKING', 'WORKING', 'WAITING', 'SUCCESS', 'ERROR', 'DISCONNECTED']
+var scenes = [], curSt = 'IDLE'
+function initLayers () {
+  var all = document.querySelectorAll('.ico')
+  for (var i = 0; i < all.length; i++) all[i].classList.add('st-IDLE')
+  setState('IDLE')
+}
+/* 状态单选：把 .st-* 打在 SVG 根上（与 runtime 同一手法），CSS 负责只显示这一态那 7 层 */
+function setState (st) {
+  curSt = st
+  var all = document.querySelectorAll('.ico')
+  for (var i = 0; i < all.length; i++) {
+    for (var j = 0; j < STATES.length; j++) all[i].classList.remove('st-' + STATES[j])
+    all[i].classList.add('st-' + st)
+  }
+}
+function activeLayers () {
+  var out = [], ls = document.querySelectorAll('.lyr-' + curSt)
+  for (var i = 0; i < ls.length; i++) out.push(ls[i])
+  return out
+}
+
+/* ---------- 进度环：唯一新增的渲染逻辑 ---------- */
+var C_SEG = 2 * Math.PI * 60, C_OUT = 2 * Math.PI * 88
+function renderRing () {
+  var Ls = activeLayers()
+  if (!Ls.length) return
+  var C = V1 ? C_SEG : C_OUT
+  var arc = P * C
+  for (var n = 0; n < Ls.length; n++) {
+    var L = Ls[n]
+    var fill = L.querySelector('.pfill')
+    if (fill) fill.setAttribute('stroke-dasharray', arc.toFixed(2) + ' ' + (C - arc).toFixed(2))
+    /* 环显示规则（用户拍板）：没有计划时"就不画环" —— 推进/完成/退步才画 */
+    var show = (STATE === 'advance' || STATE === 'complete' || STATE === 'back')
+    var pg = L.querySelector('.prog')
+    if (pg) pg.setAttribute('opacity', show ? '1' : '0')
+    var tr = L.querySelector('.ptrack')
+    if (tr) tr.setAttribute('opacity', (STATE === 'complete') ? '0.42' : '1')
+    /* 运行体：沿环走到当前角度（只用 transform: rotate） */
+    var rn = L.querySelector('.prun')
+    if (rn) rn.style.transform = 'rotate(' + RUNNER_DEG.toFixed(2) + 'deg)'
+    /* 计划变更标记：琥珀短刻度，标在上一次变更落点的百分比处 */
+    var mk = L.querySelector('.pmark')
+    if (mk) {
+      if (BACK_AT >= 0) {
+        mk.setAttribute('stroke-dashoffset', (-BACK_AT * C).toFixed(2))
+        mk.setAttribute('opacity', STATE === 'back' ? '1' : '0.5')
+      } else mk.setAttribute('opacity', '0')
+    }
+    /* 完成态"收束 → 爆散" */
+    var bp = STATE === 'complete' ? Math.min(1, T / 1100) : 0
+    var ring = L.querySelector('.burstring'), halo = L.querySelector('.bursthalo'), bc = L.querySelector('.burstcore')
+    if (!TIERS[TIER].burst) bp = 0
+    if (ring) {
+      var s1 = bp < 0.38 ? (0.26 + 0.74 * (bp / 0.38)) : (1 + 1.85 * ((bp - 0.38) / 0.62))
+      ring.style.transform = 'scale(' + s1.toFixed(3) + ')'
+      ring.setAttribute('opacity', bp <= 0 ? '0' : (bp < 0.38 ? (0.95 * (bp / 0.38)).toFixed(3) : (0.95 * (1 - (bp - 0.38) / 0.62)).toFixed(3)))
+    }
+    if (halo) {
+      var s2 = bp < 0.38 ? 0.5 : (0.5 + 1.7 * ((bp - 0.38) / 0.62))
+      halo.style.transform = 'scale(' + s2.toFixed(3) + ')'
+      halo.setAttribute('opacity', bp < 0.38 ? (0.5 * (bp / 0.38)).toFixed(3) : (0.5 * (1 - (bp - 0.38) / 0.62)).toFixed(3))
+    }
+    if (bc) {
+      var s3 = bp < 0.38 ? (0.6 + 0.55 * (bp / 0.38)) : (1.15 * (1 - 0.55 * ((bp - 0.38) / 0.62)))
+      bc.style.transform = 'scale(' + s3.toFixed(3) + ')'
+      bc.setAttribute('opacity', bp < 0.38 ? (0.55 * (bp / 0.38)).toFixed(3) : (0.55 * (1 - (bp - 0.38) / 0.62)).toFixed(3))
+    }
+    var fl = L.querySelector('.flash')
+    if (fl) fl.setAttribute('opacity', STATE === 'complete' && bp < 0.22 ? (0.55 * Math.sin(Math.PI * bp / 0.22)).toFixed(3) : '0')
+    /* 静止呼吸：空闲态让核心的辉光与核心本身极慢地明暗（只改 opacity）
+       省电档 breath=false → 完全静止（用户要求"省电档空闲时必须完全静止"） */
+    if (STATE === 'rest') {
+      var ph2 = TIERS[TIER].breath ? (0.5 - 0.5 * Math.cos(2 * Math.PI * A_TIMEPH / 2600)) : 0
+      var ga = L.querySelector('.glowA')
+      if (ga) ga.setAttribute('opacity', (CORE_OP * (0.30 + 0.70 * ph2)).toFixed(3))
+      var cg = L.querySelector('.core')
+      if (cg) cg.setAttribute('opacity', (0.62 + 0.38 * ph2).toFixed(3))
+    } else {
+      var ga2 = L.querySelector('.glowA')
+      if (ga2) ga2.setAttribute('opacity', (CORE_OP * 0.2).toFixed(3))
+      var cg2 = L.querySelector('.core')
+      if (cg2) cg2.setAttribute('opacity', '1')
+    }
+    /* 自转：v1 的现有弧已经变成进度了，不能再自转；v2 的现有弧保持原样自转 */
+    if (!V1) {
+      var sg = L.querySelector('.seg'), cl = L.querySelector('.cloud')
+      var per = TIERS[TIER].spin > 0 ? TIERS[TIER].spin : 0
+      var tf = per > 0 ? ('rotate(' + ANG.toFixed(2) + 'deg)') : ''
+      if (sg) sg.style.transform = tf
+      if (cl) cl.style.transform = tf
+    }
+  }
+}
+
+/* ---------- 三态自动循环 ---------- */
+var PH = [
+  { st: 'advance', dur: 7000, from: 0, to: 1 },
+  { st: 'complete', dur: 2200, from: 1, to: 1 },
+  { st: 'back', dur: 2600, from: 1, to: 6 / 11, note: true },
+  { st: 'advance', dur: 3400, from: 6 / 11, to: 1 },
+  { st: 'rest', dur: 2600, from: 1, to: 1 },
+  { st: 'advance', dur: 5200, from: 1, to: 1 }
+]
+var ph = 0, phT = 0
+var A_TIMEPH = 0, CORE_OP = 1
+/* 七态的 --core 值（与 runtime 的 .st-* 一致），用于静止呼吸时的辉光/核心明暗 */
+var CORE_MAP = { IDLE: 0.13, THINKING: 0.42, WORKING: 1, WAITING: 0.55, SUCCESS: 1, ERROR: 0.7, DISCONNECTED: 0.2 }
+/* 相位与状态的对应（每一相开始时都要显式设一次，否则首相位会停在 IDLE） */
+function startPhase (i) {
+  ph = i; phT = 0
+  var q = PH[ph]
+  if (q.st === 'complete') { setState('SUCCESS'); T = 0 }
+  else if (q.st === 'back') { setState('WAITING'); T = 0 }
+  else if (q.st === 'rest') setState('IDLE')
+  else setState('WORKING')
+}
+function stepPhase (dt) {
+  var q = PH[ph]
+  phT += dt
+  var u = Math.min(1, phT / q.dur)
+  STATE = q.st
+  WANT_P = q.from + (q.to - q.from) * u
+  if (q.note && u > 0.34) BACK_AT = 1
+  /* 完成态的收束：进度保持满 */
+  if (q.st === 'complete') WANT_P = 1
+  if (u >= 1) {
+    var nx = (ph + 1) % PH.length
+    if (PH[nx].st === 'advance' && PH[nx].from < 0.5) BACK_AT = -1
+    startPhase(nx)
+  }
+}
+
+/* ---------- 文字层（悬浮层 + 完整面板） ---------- */
+var SESS = [
+  { id: 'main', name: '主代理 · 当前对话', done: 0, total: 6, note: '' },
+  { id: 'reviewer', name: 'reviewer', done: 0, total: 12, note: '' },
+  { id: 'tester', name: 'tester', done: 0, total: 11, note: '' }
+]
+function totals () {
+  var d = 0, t = 0
+  for (var i = 0; i < SESS.length; i++) { d += SESS[i].done; t += SESS[i].total }
+  return { d: d, t: t, p: t ? d / t : 0 }
+}
+function renderText () {
+  var tt = totals()
+  var h1 = document.getElementById('pct1'), h2 = document.getElementById('pct2')
+  var txt = Math.round(tt.p * 100) + '%'
+  if (h1) h1.textContent = txt
+  if (h2) h2.textContent = txt
+  var bs = document.getElementById('hovbs')
+  if (bs) bs.style.transform = 'scaleX(' + tt.p.toFixed(4) + ')'
+  var bl = document.getElementById('hovbl')
+  if (bl) bl.textContent = tt.d + '/' + tt.t + ' 步 · ' + SESS.length + ' 会话'
+  var r3 = document.getElementById('hovr3')
+  if (r3) r3.innerHTML = (BACK_AT >= 0 ? '进度回退：<span class="a">计划已更新 6→11</span>（分母变大，总进度 100%→55%）' : '')
+  var pr = document.getElementById('proc')
+  if (pr) pr.textContent = (1 + SUB.length) + ' 个进程'
+  for (var i = 0; i < SESS.length; i++) {
+    var s = SESS[i]
+    var f = document.getElementById('sf-' + s.id)
+    if (f) f.style.transform = 'scaleX(' + (s.total ? s.done / s.total : 0).toFixed(4) + ')'
+    var n = document.getElementById('sn-' + s.id)
+    if (n) n.textContent = s.done + '/' + s.total + ' 步 · ' + Math.round(100 * s.done / s.total) + '%'
+    var m = document.getElementById('sm-' + s.id)
+    if (m) m.style.left = (412 * (s.done / s.total)).toFixed(1) + 'px'
+  }
+}
+var SUB = [
+  { n: 'researcher', d: 0, st: 'run', t: '· 02:14 · 17 工具' },
+  { n: 'engineer', d: 1, st: 'run', t: '· 01:03 · 9 工具' },
+  { n: 'verifier', d: 1, st: 'done', t: '· 04:41 · 31 工具' },
+  { n: 'reviewer', d: 2, st: 'done', t: '· 06:12 · 22 工具' },
+  { n: 'tester', d: 2, st: 'wait', t: '· 00:38 · 4 工具' }
+]
+
+/* ---------- 主循环：与 runtime 同一策略（<30fps 走 setTimeout 链，不挂 rAF 链） ---------- */
+var timer = 0, last = performance.now(), lastSt = ''
+function frame () {
+  timer = 0
+  var now = performance.now()
+  var dt = Math.min(now - last, 250)
+  last = now
+  TICKS++
+  if (PIN) {
+    /* ?pin=<p>.<状态>，p 可带小数（用正则取，不能用 split('.') —— 会把 0.08 拆成 0 与 08） */
+    var mm = PIN.match(/([0-9]+(?:.[0-9]+)?)(?:.([A-Za-z]+))?/)
+    P = mm ? parseFloat(mm[1]) : 0
+    STATE = (mm && mm[2]) ? mm[2] : 'advance'
+    if (STATE === 'complete') T += 400
+    if (pinApplied !== PIN) { pinApplied = PIN; applyState(STATE) }
+  } else {
+    if (PLAYING) {
+      stepPhase(dt)
+      P = WANT_P
+      /* 会话内部计数跟着总进度走（演示用：各会话按自己的分母推进） */
+      for (var i = 0; i < SESS.length; i++) SESS[i].done = Math.round(SESS[i].total * P)
+    }
+    applyState(STATE)
+  }
+  /* 自转：省电档 spin=0 → 完全不自转（空闲时必须完全静止）；静止呼吸另给一个更慢的 idleSpin。
+     注意：这段必须在 PIN 分支之外 —— 否则"钉住进度看空闲自转"根本测不到。 */
+  var per = STATE === 'rest' ? (TIERS[TIER].idleSpin || 0) : (TIERS[TIER].spin || 0)
+  if (per > 0) ANG = (ANG + 360 * (dt / 1000) / per) % 360
+  RUNNER_DEG = P * 360
+  A_TIMEPH = (A_TIMEPH + dt) % 100000
+  T = (STATE === 'complete') ? T + dt : 0
+  renderRing()
+  renderText()
+  paintProbe()
+  schedule()
+}
+/* 状态单选只在真正变化时写一次 DOM */
+function applyState (st) {
+  if (st === lastSt) return
+  lastSt = st
+  var key = st === 'complete' ? 'SUCCESS' : st === 'rest' ? 'IDLE' : st === 'back' ? 'WAITING' : 'WORKING'
+  CORE_OP = CORE_MAP[key]
+  setState(key)
+}
+function schedule () {
+  if (!PLAYING && !PIN) return
+  var fps = TIERS[TIER].fps
+  timer = setTimeout(frame, Math.max(0, 1000 / fps - (performance.now() - last)))
+}
+function kick () { if (!timer) { last = performance.now(); frame() } }
+
+/* ---------- 控件 ---------- */
+document.addEventListener('DOMContentLoaded', function () {
+  var tg = document.getElementById('toggle')
+  if (tg) tg.onclick = function () { PLAYING = !PLAYING; this.textContent = PLAYING ? '暂停' : '播放'; if (PLAYING) kick() }
+  var tbs = document.querySelectorAll('[data-tier]')
+  for (var i = 0; i < tbs.length; i++) {
+    tbs[i].onclick = (function (b) {
+      return function () {
+        TIER = b.getAttribute('data-tier')
+        var all = document.querySelectorAll('[data-tier]')
+        for (var j = 0; j < all.length; j++) all[j].classList.toggle('on', all[j] === b)
+        var fv = document.getElementById('fv'); if (fv) fv.textContent = TIERS[TIER].fps + ' fps'
+        kick()
+      }
+    })(tbs[i])
+  }
+  var pb = document.getElementById('ptoggle')
+  if (pb) pb.onclick = function () {
+    PANEL = !PANEL
+    var pw = document.getElementById('panw'); if (pw) pw.style.display = PANEL ? '' : 'none'
+    this.textContent = PANEL ? '隐藏面板' : '展开面板'
+  }
+  initLayers()
+  startPhase(0)
+  kick()
+})
+if (document.readyState !== 'loading') {
+  initLayers(); startPhase(0); kick()
+}
+</script></body></html>

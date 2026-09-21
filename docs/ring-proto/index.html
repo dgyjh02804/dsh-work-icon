@@ -1,0 +1,131 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>进度环原型 · v1 / v2 对照</title>
+<style>*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:system-ui,"Microsoft YaHei",sans-serif;background:#0d1117;color:#e4ecf4;width:1260px}
+.bar{position:sticky;top:0;z-index:9;background:#111823;border-bottom:1px solid #23303f;padding:8px 14px;white-space:nowrap}
+.bar a{color:#6fb6ff;text-decoration:none;font-size:12px;margin-right:12px}
+.bar button{background:#1b2634;color:#cfe0ea;border:1px solid #33506a;border-radius:3px;padding:3px 9px;font-size:11px;margin-right:6px;cursor:pointer}
+.bar button.on{background:#56d9c8;color:#0d1117;border-color:#56d9c8;font-weight:700}
+.bar .nm{font-size:13px;font-weight:700;margin-right:12px}
+#probe{display:inline-block;font:400 10px/18px ui-monospace,Consolas,monospace;color:#7e94ac;margin-left:10px;padding-left:10px;border-left:1px solid #2a3a4c}
+#probe b{color:#8fe0d2}
+#jserr{display:inline-block;font:400 10px/18px ui-monospace,Consolas,monospace;color:#ff8b8b;margin-left:10px}
+.row{white-space:nowrap}
+.side{display:inline-block;vertical-align:top}
+.desk{position:relative;width:620px;height:300px;overflow:hidden}
+.desk.dk{background:linear-gradient(158deg,#3c4147,#33383e 46%,#292d32)}
+.desk.lt{background:linear-gradient(158deg,#eceae5,#dedbd4 52%,#cfccc5)}
+.iconw{position:absolute;left:26px;top:26px}
+.hovw{position:absolute;left:26px;top:196px}
+.panw{position:absolute;left:300px;top:40px}
+
+/* ===== 图标本体（几何与 runtime 完全一致） ===== */
+.ico{display:block}
+/* 与 runtime 同一条：轴心 50% 50% + transform-box:view-box（绝不用 rotate(a 100 100) 双轴心） */
+.cloud,.seg,.prun{will-change:transform;transform-origin:50% 50%;transform-box:view-box}
+body[data-freeze="1"] .cloud,body[data-freeze="1"] .seg,body[data-freeze="1"] .prun{will-change:auto}
+.core{transform:none}
+.pfill,.ptrack,.pmark{transition:none}
+.pmark{transition:opacity .25s linear}
+/* 完成态爆散：静态几何 + scale/opacity（无 blur、无 box-shadow、无 backdrop-filter） */
+.burstring,.bursthalo,.burstcore{transform-origin:50% 50%;transform-box:view-box}
+.lyr{display:none}
+/* 状态由 SVG 根上的 .st-* 单选（与 runtime 的 .layer.st-* 同一手法），只显示这一态那 7 层 */
+.st-IDLE .lyr-IDLE,.st-THINKING .lyr-THINKING,.st-WORKING .lyr-WORKING,.st-WAITING .lyr-WAITING,
+.st-SUCCESS .lyr-SUCCESS,.st-ERROR .lyr-ERROR,.st-DISCONNECTED .lyr-DISCONNECTED{display:inline}
+/* 七态配色：逐项照抄 runtime 的 .st-*（c1 / c2 / core） */
+.st-IDLE        {--c1:#3d7688;--c2:#1b3b47;--glow:rgba(80,190,220,.20);--core:.13}
+.st-THINKING    {--c1:#38e8ff;--c2:#176c85;--glow:rgba(56,232,255,.55);--core:.42}
+.st-WORKING     {--c1:#5cffd0;--c2:#128f78;--glow:rgba(92,255,208,.62);--core:1}
+.st-WAITING     {--c1:#ffb340;--c2:#a35a08;--glow:rgba(255,179,64,.62);--core:.55}
+.st-SUCCESS     {--c1:#8dffae;--c2:#1f9b5a;--glow:rgba(141,255,174,.55);--core:1}
+.st-ERROR       {--c1:#ff4d6d;--c2:#8e0f2a;--glow:rgba(255,77,109,.62);--core:.7}
+.st-DISCONNECTED{--c1:#5a636e;--c2:#2b3138;--glow:rgba(140,150,160,.16);--core:.2}
+/* 核心辉光：runtime 用 SVG opacity="calc(var(--core) * .2)"（现代 Chromium 支持），
+   但 --core 必须定义在同一个 SVG 根上才解析得到 —— 上面的 .st-* 就挂在 SVG 根上。 */
+.glowA{opacity:calc(var(--core,.55) * .2)}
+
+/* ===== 悬浮层（1:1 抄 runtime 的 v2hover 口径：272 宽 / plate 底） ===== */
+#hov{position:absolute;width:272px;padding:5px 7px;border-radius:5px;background:rgba(16,30,47,.78);
+  border:1px solid rgba(74,127,168,.85);font-family:ui-monospace,Consolas,monospace;pointer-events:none}
+#hov .r1{height:15px;line-height:15px;white-space:nowrap}
+#hov .st{font-size:12.5px;font-weight:700;color:#f4f8fa}
+#hov .tok{float:right;font-size:9px;color:#cfe0ea}
+#hov .h3{display:block;height:12px;line-height:12px;font-size:9.5px;color:#bcd0dd;white-space:nowrap;overflow:hidden}
+#hov .r2{display:block;height:15px;line-height:15px;font-size:10px;color:#cfdcea;white-space:nowrap}
+#hov .r2 .k{color:#8fa8bd}
+#hov .r2 .v{color:#e8f0fa;font-variant-numeric:tabular-nums}
+#hov .r3{display:block;height:13px;line-height:13px;font-size:9px;color:#ffc266;white-space:nowrap;overflow:hidden}
+#hov .r3:empty{display:none}
+#hov .r3 .a{color:#7fe3c8}
+/* 子弹图（与 runtime .v2bullet 同款：区间底 + 实际值 scaleX + 上限竖线） */
+.bl2{position:relative;display:block;height:13px}
+.bl2 .bq{position:absolute;left:0;top:3px;height:6px;background:rgba(232,244,252,.2);border-radius:1px;width:258px}
+.bl2 .bs{position:absolute;top:3px;left:0;height:6px;background:#56d9c8;border-radius:1px;width:258px;
+  transform-origin:0 50%;transform:scaleX(0)}
+.bl2 .bt{position:absolute;top:0;width:1px;height:12px;background:#ffc266;left:258px}
+.bl2 .bl{position:absolute;right:0;top:0;font-size:8.5px;line-height:13px;color:#e6eef4;white-space:nowrap}
+
+/* ===== 完整面板：多对话多条进度条（1:1 抄 runtime 的面板口径 440 宽） ===== */
+#pan{width:440px;border:1px solid #4a7fa8;border-radius:5px;padding:9px 14px 11px;
+  background:linear-gradient(168deg,rgba(24,41,63,.82) 0%,rgba(18,33,52,.8) 38%,rgba(14,26,42,.8) 100%)}
+#pan .ph2{height:13px;line-height:13px;font:400 8.5px/1 ui-monospace,Consolas,monospace;color:#c3d6e6;letter-spacing:1.4px}
+#pan .ph2 .he{float:right;letter-spacing:0}
+#pan .sess{margin-top:7px}
+#pan .srow{height:15px;line-height:15px;font-size:10.5px;color:#cfdcea;white-space:nowrap;overflow:hidden}
+#pan .srow .agg{float:right;font:400 9px/15px ui-monospace,Consolas,monospace;color:#e8f0fa}
+#pan .sbar{position:relative;display:block;height:7px;margin:1px 0 2px}
+#pan .sq{position:absolute;left:0;top:2px;height:3px;width:412px;background:rgba(232,244,252,.18);border-radius:1px}
+#pan .sf{position:absolute;top:2px;left:0;height:3px;width:412px;background:#56d9c8;border-radius:1px;transform-origin:0 50%;transform:scaleX(0)}
+#pan .sbar .sm{position:absolute;top:0;width:1px;height:7px;background:#ffc266}
+#pan .plan{font:400 8.5px/12px ui-monospace,Consolas,monospace;color:#ffc266;height:12px;white-space:nowrap;overflow:hidden}
+#pan .tree2{margin-top:8px}
+#pan .trow{position:relative;height:19px;line-height:19px;font-size:10.5px;white-space:nowrap;overflow:hidden}
+#pan .trow.d1{padding-left:11px}#pan .trow.d2{padding-left:22px}
+#pan .trow .tw{color:#4d6b86;font-family:ui-monospace,Consolas,monospace}
+#pan .trow .tail{float:right;font:400 8.5px/19px ui-monospace,Consolas,monospace;color:#92aac0;margin-left:8px}
+#pan .trow .ic{display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:7px;vertical-align:0}
+#pan .trow .ic.run{background:#56d9c8}#pan .trow .ic.done{background:#7fe3c8}
+#pan .trow .ic.wait{background:none;border:1.3px solid #7e94ac}
+#pan .foot{margin-top:7px;padding-top:5px;border-top:1px solid rgba(157,196,230,.16);
+  font:400 8.5px/1.5 ui-monospace,Consolas,monospace;color:#7e94ac;white-space:normal}
+
+.cap{padding:16px 22px 26px;background:#111823;color:#e4ecf4;width:1260px}
+.cap h3{margin:0 0 8px;font-size:16px}
+.cap h3 .ref{font-size:10px;color:#6fb6ff;border:1px solid #2e4a63;border-radius:3px;padding:1px 6px;margin-left:8px;vertical-align:2px}
+.cap div{font-size:11.5px;line-height:1.78;color:#a9bccd}
+.cap .k{display:inline-block;width:112px;color:#7e94ac;vertical-align:top}
+.cap b{color:#e4ecf4}
+.cap table{border-collapse:collapse;margin-top:6px;font:400 11px/1.65 ui-monospace,Consolas,monospace;color:#a9bccd;white-space:normal}
+.cap td,.cap th{border:1px solid #26313d;padding:3px 9px;text-align:left;vertical-align:top}
+.cap ul{margin:4px 0 0 18px;padding:0}.cap li{margin:3px 0}
+.cmp{display:inline-block;vertical-align:top;margin-right:26px}
+.idx a{display:block;padding:11px 14px;margin:8px 0;background:#161f2b;border-left:3px solid #4a7fa8;border-radius:0 4px 4px 0;color:#cfe0ea;text-decoration:none;font-size:13px}
+.idx a:hover{border-left-color:#56d9c8;background:#1b2634}
+.idx a span{color:#8fa8bd;font-size:11px;margin-left:8px;display:block;margin-top:3px}
+</style></head><body data-ticks="0">
+<div class="cap" style="padding-bottom:4px"><h3>进度环原型 v1 / v2 <span class="ref">背景层 = 真实 H2「等离云核」，只读复制自 runtime/electron/index.html</span></h3>
+<div><b>先看这一页判断"哪个更像套在外面"，再看动效。</b>两页都是真动画：三态自动循环（推进 → 完成收束+爆散 → 静止呼吸）、三档可切、可暂停。</div>
+<div><span class="k">尺寸口径</span>图标按产品真实尺寸渲染（144px，viewBox 0 0 200 200）；用户口径的 140px 与它是同一套几何，只是缩放不同。</div>
+<div><span class="k">已满足的五条</span>① 背景就是云核本体，没有另做背景 ② 进度＝ORBITAL 一圈轨道环 ③ v1 让<b>现有那几段弧</b>成为进度（零几何代价）④ 完成＝收束后再爆散 ⑤ <b>没有计划时就不画环</b>（静止呼吸态整环 opacity:0）</div>
+<div><span class="k">实测 CPU（单核占比）</span><b>省电 1.7%｜标准 4.2~5.2%｜流畅 5.2~5.9%｜暂停基线 0.02%</b>（无头 Edge / 1260×1000 / 单页 2 枚图标 / 每格 12s / 3 次中位数）</div>
+<div><span class="k">三档 tick 实测</span>3 秒内 <b>12 / 40 / 80</b> 次，即 4 / 15 / 30 fps；空闲态省电档云核与现有弧<b>完全冻结</b></div>
+<div><span class="k">机器验证</span>tick 递增 ✅｜#jserr 为空 ✅｜computed transform 逐帧变化 ✅｜环填充随之变化 ✅｜computed 全扫 0 处 backdrop-filter / filter / box-shadow ✅</div>
+</div>
+<div class="cap idx" style="padding-top:0;padding-bottom:26px">
+<a href="./v1-reuse-arcs.html">v1 · 复用现有弧（零几何代价）<span>半径 60、stroke-width 2 —— 就是产品里那圈会转的分段弧；变成进度后它不再自转</span></a>
+<a href="./v2-outer-ring.html">v2 · 最外圈另起一层（r=88）<span>紧贴 tick 刻度环内缘，现有弧保持原样自转 —— 常态动感一点不损失</span></a>
+<h3 style="margin-top:18px">其余需求落在哪</h3>
+<table>
+<tr><th>需求</th><th>落在哪</th></tr>
+<tr><td>多对话显示<b>全部对话的总进度</b></td><td>v1/v2 环上的填充与悬浮层"总进度 %"都是 = Σ已完成步数 / Σ总步数（3 个会话加权合计，不是其中一个会话）</td></tr>
+<tr><td><b>允许进度倒退</b>且必须在悬浮层说明原因</td><td>三态循环里专门排了一段"计划已更新 6→11"：总进度 100%→55%，环回缩，悬浮层出现琥珀一行说明；环上同时保留琥珀短刻度标在变更点</td></tr>
+<tr><td>悬浮层：总进度条 + 进程数</td><td>悬浮层第 2 行 = 总进度 % + 进程数（主代理 + 子代理）；第 3 行是子弹图总进度条</td></tr>
+<tr><td>完整面板：多对话多条进度条</td><td>右侧 440px 面板：3 条会话进度条 + 各自步数 + 计划变更说明 + 子代理树</td></tr>
+<tr><td>子代理不给百分比</td><td>树里只有 状态点 + 时长 + 工具数，没有 %</td></tr>
+</table>
+</div>
+<script>
+window.onerror = function (m, f, l) { try { var d = document.createElement('div'); d.id = 'jserr'; d.textContent = 'JSERR:' + m + '@' + l; document.body.appendChild(d); document.body.setAttribute('data-jserr', String(m)) } catch (e) {} }
+var TICKS = 0
+setInterval(function () { TICKS++; document.body.setAttribute('data-ticks', String(TICKS)); document.title = 't=' + TICKS + '|index|err=none' }, 250)
+</script></body></html>

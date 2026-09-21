@@ -1,0 +1,61 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>进度方案 · 真动效总入口</title>
+<style>
+  *{box-sizing:border-box}html,body{margin:0;padding:0}
+  body{font-family:system-ui,"Microsoft YaHei",sans-serif;background:#0d1117;width:1200px;color:#e4ecf4}
+  .bar{position:sticky;top:0;z-index:9;background:#111823;border-bottom:1px solid #23303f;padding:8px 14px;white-space:nowrap}
+  .bar a{color:#6fb6ff;text-decoration:none;font-size:12px;margin-right:14px}
+  .bar button{background:#1b2634;color:#cfe0ea;border:1px solid #33506a;border-radius:3px;padding:3px 9px;font-size:11px;margin-right:6px;cursor:pointer}
+  .bar button.on{background:#56d9c8;color:#0d1117;border-color:#56d9c8;font-weight:700}
+  .bar .nm{font-size:13px;font-weight:700;margin-right:12px}
+  .row{white-space:nowrap}
+  .side{display:inline-block;vertical-align:top}
+  .desk{position:relative;width:600px;height:430px;overflow:hidden}
+  .iconw{position:absolute;left:60px;top:26px}
+  .hovw{position:absolute;left:40px;top:200px;display:flex;align-items:center}
+  .hov{position:relative;width:250px;padding:5px 7px;border-radius:5px;background:rgba(16,30,47,.78);border:1px solid rgba(74,127,168,.85)}
+  .hov.noplate{background:transparent;border:0}
+  .hov .gwrap{float:left;margin-right:9px}
+  .hov .h1,.hov .h3{display:block;height:14px;line-height:14px;white-space:nowrap}
+  .hov .h3{height:12px;line-height:12px;font-size:9.5px;color:#bcd0dd}
+  .st{font-size:12.5px;color:#f2f7fa;font-weight:700}
+  .tok{float:right;font:400 9px/14px ui-monospace,Consolas,monospace;color:#cfe0ea}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#56d9c8;margin-right:6px;vertical-align:1px}
+  .warn{color:#ffc266}
+  .ruler{position:relative;display:block;height:9px;margin:2px 0 1px;border-top:1px solid rgba(232,244,252,.85);border-bottom:1px solid rgba(232,244,252,.35)}
+  .ruler i{position:absolute;top:0;width:1px;height:4px;background:rgba(232,244,252,.8)}
+  .ruler i.long{height:9px}
+  .bullet{position:relative;display:block;height:12px}
+  .bq{position:absolute;left:0;top:3px;width:130px;height:6px;background:rgba(232,244,252,.22);border-radius:1px}
+  .bs{position:absolute;top:3px;left:0;width:84px;height:6px;background:#56d9c8;border-radius:1px}
+  .bt{position:absolute;top:0;left:130px;width:1px;height:12px;background:#ffc266}
+  .bl{position:absolute;right:0;top:0;font:400 8.5px/12px ui-monospace,Consolas,monospace;color:#e6eef4}
+  .panw{position:absolute;left:40px;top:280px}
+  .panel{width:520px;padding:10px 13px 9px;border-radius:6px;background:rgba(16,30,47,.9);border:1px solid #4a7fa8}
+  .ph{height:13px;line-height:13px}
+  .kick{font:400 8.5px/1 ui-monospace,Consolas,monospace;letter-spacing:1.4px;color:#92aac0}
+  .he{float:right;font:400 8.5px/1 ui-monospace,Consolas,monospace;color:#92aac0}
+  .prow{white-space:nowrap;margin-top:5px}
+  .pcell{display:inline-block;width:33.3%;vertical-align:top;text-align:center}
+  .pname{font-size:10px;color:#dbe6f2}
+  .pnum{font:400 10px/13px ui-monospace,Consolas,monospace;color:#e8f0fa}
+  .stt{display:inline-block;font:400 10px/18px ui-monospace,Consolas,monospace;color:#92aac0;margin-left:10px}
+  .stt b{color:#56d9c8}
+  .cap{padding:16px 22px 22px;background:#111823;color:#e4ecf4}
+  .cap h3{margin:0 0 8px;font-size:16px}
+  .cap h3 .ref{font-size:9.5px;color:#6fb6ff;border:1px solid #2e4a63;border-radius:3px;padding:1px 6px;margin-left:8px;vertical-align:2px}
+  .cap div{font-size:11.5px;line-height:1.78;color:#a9bccd}
+  .cap .k{display:inline-block;width:104px;color:#7e94ac}
+  .cap b{color:#e4ecf4}
+  .cap table{border-collapse:collapse;margin-top:6px;font:400 11px/1.6 ui-monospace,Consolas,monospace;color:#a9bccd}
+  .cap td,.cap th{border:1px solid #26313d;padding:3px 9px;text-align:left}
+  .idx a{display:block;padding:9px 12px;margin:6px 0;background:#161f2b;border-left:3px solid #4a7fa8;border-radius:0 4px 4px 0;color:#cfe0ea;text-decoration:none;font-size:13px}
+  .idx a:hover{border-left-color:#56d9c8;background:#1b2634}
+  .idx a span{color:#8fa8bd;font-size:11px;margin-left:8px}
+</style></head><body>
+<div class="cap" style="padding-bottom:6px"><h3>进度方案总入口 <span class="ref">全部页面都是真动效（纯 transform/opacity，无逐帧重绘）</span></h3>
+<div>点进任意方案看它<b>真的在动</b>：三态自动循环（推进 → 完成换形态 → 静止呼吸），可暂停、可切三档（省电/标准/流畅）。</div></div>
+<div class="cap idx" style="padding-top:0">
+<h3 style="margin:18px 0 6px;font-size:14px;color:#cfe0ea">第一批（形状本身够特别）<span style="font-size:11px;color:#8fa8bd;margin-left:10px">复用图标本体：环 / 核心粒子 / 生长 / 扫掠</span></h3><a href="./orbital.html">① ORBITAL · 轨道环<span>环系 · 复用图标本体</span></a><a href="./nebula.html">② NEBULA · 星云场<span>粒子 · 复用图标核心材质</span></a><a href="./crystal.html">③ CRYSTAL · 结晶生长<span>有机生长 · 从核心三角长出</span></a><a href="./radar.html">④ RADAR · 极坐标扇区<span>扫掠 · 复用图标刻度环</span></a>
+<h3 style="margin:18px 0 6px;font-size:14px;color:#cfe0ea">第二批（概念有血缘，但形状更普通）<span style="font-size:11px;color:#8fa8bd;margin-left:10px">波纹 / 矩阵 / 波形 / 递归 —— 如实标注：形状本身不如第一批特别</span></h3><a href="./field.html">⑤ FIELD · 能量场<span>波纹 · 复用图标辉光</span></a><a href="./grid.html">⑥ GRID · 网格电池<span>矩列 · 复用面板网格纹理</span></a><a href="./pulse.html">⑦ PULSE · 心电波形<span>波形 · 图标心跳的字面化</span></a><a href="./fractal.html">⑧ FRACTAL · 分形递归<span>递归 · 图标自相似性</span></a>
+<h3 style="margin:18px 0 6px;font-size:14px;color:#cfe0ea">组合（ORBITAL + NEBULA + FRACTAL，4 版职责分工）<span style="font-size:11px;color:#8fa8bd;margin-left:10px">版 D 为推荐：环=进度 · 云=状态 · 分形=结构（职责正交）</span></h3><a href="./combo-A.html">组合 A · 环主进度<span>环=进度 · 云=状态 · 分形=完成态</span></a><a href="./combo-B.html">组合 B · 云主进度<span>云=进度 · 环=外壳 · 分形=层级</span></a><a href="./combo-C.html">组合 C · 分形主进度<span>分形=进度 · 环=读数 · 云=背景</span></a><a href="./combo-D.html">组合 D · 推荐（职责正交）<span>环=进度 · 云=状态 · 分形=层级结构</span></a>
+</div></body></html>

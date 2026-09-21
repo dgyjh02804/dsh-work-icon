@@ -1,0 +1,21 @@
+{
+  "name": "dsh-work-icon-runtime-electron",
+  "version": "1.0.0",
+  "private": true,
+  "description": "dsh-work-icon 的 Electron 原生窗口运行时（H2「等离云核」）：透明置顶窗 + 七态 + stdio 协议",
+  "main": "main.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "start:visible": "electron . --state IDLE",
+    "test": "node tests/run-all.mjs",
+    "test:shots": "node tests/shots.mjs",
+    "test:protocol": "node tests/protocol.mjs",
+    "test:position": "node tests/position.mjs",
+    "test:perf": "node tests/perf.mjs",
+    "test:compare": "node tests/compare-golden.mjs"
+  },
+  "devDependencies": {
+    "electron": "44.3.0"
+  }
+}

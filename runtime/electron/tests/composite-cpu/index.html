@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>合成层 vs 重绘 CPU 对照</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;
+    font-family:system-ui,"Microsoft YaHei",sans-serif;-webkit-user-select:none;user-select:none}
+  #ico{position:absolute;left:160px;top:20px;width:140px;height:140px}
+  /* 悬浮层：**无底板**，C-130J HUD 手法 = 单色 + 描边 + 刻度带（不是靠暗雾托字） */
+  #hover{position:absolute;left:98px;top:168px;width:264px}
+  .h1{height:15px;line-height:15px;white-space:nowrap;font-size:12.5px;font-weight:700;color:#f4f8fa;
+    text-shadow:0 0 2px rgba(2,6,12,.9),0 1px 2px rgba(2,6,12,.95)}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#56d9c8;margin-right:6px;vertical-align:1px}
+  .tok{float:right;font:400 9px/15px ui-monospace,Consolas,monospace;color:#cfe0ea;text-shadow:0 0 2px rgba(2,6,12,.9)}
+  /* 刻度带（HUD 的骨架手法）：1px 线 + 向内刻度，几乎不占像素 */
+  .ruler{position:relative;height:9px;margin:3px 0 2px;border-top:1px solid rgba(226,240,248,.75);
+    border-bottom:1px solid rgba(226,240,248,.35)}
+  .ruler i{position:absolute;top:0;width:1px;height:4px;background:rgba(226,240,248,.75)}
+  .ruler i.long{height:9px}
+  /* 子弹图语义的一条总条：定性区间底 + 实际值 + 目标竖线（已用/预算/上限） */
+  .bullet{position:relative;height:12px;margin-top:2px}
+  .bq{position:absolute;left:0;top:3px;width:150px;height:6px;background:rgba(226,240,248,.20);border-radius:1px}
+  .bs{position:absolute;top:3px;height:6px;width:96px;background:#56d9c8;border-radius:1px}
+  .bt{position:absolute;top:0;left:150px;width:1px;height:12px;background:#ffc266}
+  .bl{position:absolute;right:0;top:0;height:12px;line-height:12px;font:400 9px/12px ui-monospace,Consolas,monospace;color:#e6eef4;
+    text-shadow:0 0 2px rgba(2,6,12,.9)}
+  /* 分段格子 + background-position 行进（参考表里"最便宜的持续动"） */
+  .steps{position:absolute;left:0;top:0;width:150px;height:6px;opacity:.9;
+    background-image:repeating-linear-gradient(90deg,rgba(226,240,248,.55) 0 6px,rgba(226,240,248,0) 6px 9px)}
+  #panel{position:absolute;left:40px;top:236px;width:380px;padding:10px 12px;border-radius:6px;
+    background:rgba(16,30,47,.88);border:1px solid #4a7fa8}
+  .ph{height:13px;line-height:13px;font:400 8.5px/1 ui-monospace,Consolas,monospace;color:#92aac0;letter-spacing:1.2px}
+  .ph .he{float:right;letter-spacing:0}
+  .prow{margin-top:8px;white-space:nowrap;text-align:center}
+  .pcell{display:inline-block;width:33.3%;vertical-align:top;text-align:center}
+  .pname{font-size:10px;color:#dbe6f2;margin-top:2px}
+  .pnum{font:400 10.5px/14px ui-monospace,Consolas,monospace;color:#e8f0fa}
+  .pnote{height:12px;font-size:8.5px;color:#ffc266}
+  #glow{position:absolute;left:210px;top:90px;width:40px;height:40px;border-radius:50%;background:#56d9c8;opacity:.35}
+  #pbar{position:absolute;left:40px;top:206px;height:4px;width:120px;background:#56d9c8}
+  svg{display:block}
+</style></head><body>
+<div id="ico"></div>
+<div id="glow" style="display:none"></div>
+<div id="pbar" style="display:none"></div>
+<div id="hover">
+  <div class="h1"><span class="dot"></span>执行中 · Bash<span class="tok">128.4k tok</span></div>
+  <div class="ruler" id="ruler"></div>
+  <div class="bullet">
+    <div class="bq"></div><div class="bs" id="bshot"></div><div class="bt"></div>
+    <div class="steps" id="steps"></div>
+    <div class="bl">已用 4/6 · 预算 8 · 上限 12</div>
+  </div>
+</div>
+<div id="panel">
+  <div class="ph">CONVERSATIONS · 3<span class="he" id="ptot">总 4/6</span></div>
+  <div class="prow" id="prow"></div>
+</div>
+<script>
+var Q = new URLSearchParams(location.search)
+var MODE = Q.get('mode') || 'static'
+var FPS = 30, BUDGET = 1000 / FPS
+
+/* ---- H2 图标（与生产同几何）---- */
+;(function () {
+  var s = '', rnd = (function () { var x = 90210; return function () { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296 } })()
+  for (var i = 0; i < 98; i++) {
+    var th = rnd() * 6.283, r = 72 + 20 * Math.sqrt(rnd()), z = rnd()
+    s += '<circle cx="' + (100 + Math.cos(th) * r).toFixed(1) + '" cy="' + (100 + Math.sin(th) * r * 0.94).toFixed(1) + '" r="' + (0.85 + z * 1.5).toFixed(2) + '" fill="#56d9c8" opacity="' + (0.26 + 0.74 * z).toFixed(2) + '"/>'
+  }
+  document.getElementById('ico').innerHTML =
+    '<svg width="140" height="140" viewBox="0 0 200 200"><defs><radialGradient id="pg" cx="50%" cy="50%" r="50%">' +
+    '<stop offset="0%" stop-color="#07121d" stop-opacity=".92"/><stop offset="78%" stop-color="#07121d" stop-opacity=".56"/>' +
+    '<stop offset="100%" stop-color="#07121d" stop-opacity="0"/></radialGradient>' +
+    '<filter id="bl"><feGaussianBlur stdDeviation="6"/></filter></defs>' +
+    '<circle cx="100" cy="100" r="97" fill="url(#pg)"/><circle cx="100" cy="100" r="94" fill="none" stroke="#3f6f86" stroke-width="1" stroke-dasharray="1.5 7"/>' +
+    '<g id="cloud">' + s + '</g><circle id="seg" cx="100" cy="100" r="60" fill="none" stroke="#56d9c8" stroke-width="2" stroke-dasharray="40 16 8 16" stroke-linecap="round"/>' +
+    '<circle cx="100" cy="100" r="48" fill="none" stroke="#3f6f86" stroke-width="1"/>' +
+    '<circle id="glowc" cx="100" cy="100" r="44" fill="#56d9c8" opacity=".18" filter="url(#bl)"/>' +
+    '<path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="#56d9c8" stroke-width="2.6" stroke-linejoin="round"/><circle cx="100" cy="100" r="12" fill="#56d9c8"/></svg>'
+})()
+
+/* ---- 刻度带：1px 线 + 向内刻度（HUD 手法，静态生成，不参与动画）---- */
+;(function () {
+  var h = ''
+  for (var i = 0; i < 26; i++) h += '<i class="' + (i % 5 === 0 ? 'long' : '') + '" style="left:' + (i * 6) + 'px"></i>'
+  document.getElementById('ruler').innerHTML = h
+})()
+
+/* ---- 面板里的 3 个非线性图形（轨道环 / 星云 / 扇区），静态生成 ---- */
+function glyph (kind, size, p, seed) {
+  var rnd = (function () { var x = seed >>> 0; return function () { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296 } })()
+  var cx = size / 2, R = size / 2 - 4, s = '', i
+  if (kind === 'orbital') {
+    var c = 2 * Math.PI * R, a = -90 + 360 * p, rad = a * Math.PI / 180
+    s += '<circle cx="' + cx + '" cy="' + cx + '" r="' + R + '" fill="none" stroke="#92aac0" stroke-opacity=".22" stroke-width="1.2" stroke-dasharray="1.5 5"/>'
+    s += '<circle cx="' + cx + '" cy="' + cx + '" r="' + R + '" fill="none" stroke="#56d9c8" stroke-width="3" stroke-linecap="round" stroke-dasharray="' + (c * p).toFixed(1) + ' ' + c.toFixed(1) + '" transform="rotate(-90 ' + cx + ' ' + cx + ')"/>'
+    s += '<circle id="orb' + seed + '" cx="' + (cx + Math.cos(rad) * R).toFixed(1) + '" cy="' + (cx + Math.sin(rad) * R).toFixed(1) + '" r="3" fill="#e8f0fa"/>'
+  } else if (kind === 'nebula') {
+    for (i = 0; i < 60; i++) {
+      var th = rnd() * 6.283, rr = (R * (0.94 - 0.5 * p)) + R * 0.4 * Math.sqrt(rnd()), z = rnd()
+      s += '<circle cx="' + (cx + Math.cos(th) * rr).toFixed(1) + '" cy="' + (cx + Math.sin(th) * rr * 0.96).toFixed(1) + '" r="' + (0.6 + z * 1.2).toFixed(2) + '" fill="' + (z > 0.55 ? '#56d9c8' : '#92aac0') + '" opacity="' + (0.2 + 0.6 * z).toFixed(2) + '"/>'
+    }
+    s += '<circle cx="' + cx + '" cy="' + cx + '" r="' + (2 + 5 * p).toFixed(1) + '" fill="#e8f0fa" opacity=".8"/>'
+  } else {
+    var N = 24, lit = Math.round(p * N)
+    for (i = 0; i < N; i++) s += '<line x1="' + cx + '" y1="' + (cx - R) + '" x2="' + cx + '" y2="' + (cx - R + 3) + '" stroke="#92aac0" stroke-opacity=".35" stroke-width="1.3" transform="rotate(' + (360 / N) * i + ' ' + cx + ' ' + cx + ')"/>'
+    var ang = 360 * p - 90, large = 360 * p > 180 ? 1 : 0
+    var x2 = cx + Math.cos(ang * Math.PI / 180) * (R - 5), y2 = cx + Math.sin(ang * Math.PI / 180) * (R - 5)
+    s += '<path d="M' + cx + ' ' + cx + ' L' + cx + ' ' + (cx - (R - 5)) + ' A' + (R - 5) + ' ' + (R - 5) + ' 0 ' + large + ' 1 ' + x2.toFixed(1) + ' ' + y2.toFixed(1) + ' Z" fill="#56d9c8" fill-opacity=".28" stroke="#56d9c8" stroke-opacity=".6" stroke-width="1"/>'
+    s += '<line id="sw' + seed + '" x1="' + cx + '" y1="' + cx + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="#e8f0fa" stroke-width="1.5" opacity=".9"/>'
+  }
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' + s + '</svg>'
+}
+var kinds = ['orbital', 'nebula', 'radar'], ps = [0.67, 0.42, 0.28], row = ''
+for (var i = 0; i < 3; i++) row += '<div class="pcell">' + glyph(kinds[i], 88, ps[i], 11 + i * 7) + '<div class="pname">会话 ' + (i + 1) + '</div><div class="pnum">计划 ' + Math.round(ps[i] * 8) + '/8</div><div class="pnote">' + (i === 1 ? '▲ 计划已更新 6→11' : '') + '</div></div>'
+document.getElementById('prow').innerHTML = row
+
+/* ===================== 三种驱动方式 ===================== */
+var cloud = document.getElementById('cloud'), seg = document.getElementById('seg')
+var bshot = document.getElementById('bshot'), steps = document.getElementById('steps')
+var last = 0, ang = 0, bp = 0
+function frameStatic () { /* 静止：不排任何帧 */ }
+function frameComposite (now) {
+  if (now - last < BUDGET) return
+  last = now; ang = (ang + 1.2) % 360; bp = (bp + 1) % 9
+  /* 只动 transform / opacity / background-position —— 全部走合成层 */
+  cloud.setAttribute('transform', 'rotate(' + ang.toFixed(1) + ' 100 100)')
+  seg.setAttribute('transform', 'rotate(' + (-ang * 0.6).toFixed(1) + ' 100 100)')
+  steps.style.backgroundPosition = bp + 'px 0'
+  bshot.style.opacity = (0.82 + 0.18 * Math.abs(Math.sin(ang / 40))).toFixed(2)
+  var o = document.getElementById('orb11')
+  if (o) o.setAttribute('transform', 'rotate(' + ang.toFixed(1) + ' 44 44)')
+}
+function framePaint (now) {
+  if (now - last < BUDGET) return
+  last = now; ang = (ang + 1.2) % 360; bp = (bp + 1) % 9
+  /* 昂贵三类：width / filter:blur / box-shadow 逐帧 —— 会触发重排 + 重绘 */
+  bshot.style.width = (70 + 30 * Math.abs(Math.sin(ang / 30))).toFixed(1) + 'px'
+  document.getElementById('glowc').setAttribute('stdDeviation', (4 + 4 * Math.abs(Math.sin(ang / 25))).toFixed(2))
+  cloud.style.filter = 'blur(' + (0.4 * Math.abs(Math.sin(ang / 20))).toFixed(2) + 'px)'
+  document.getElementById('pbar').style.boxShadow = '0 0 ' + (2 + 6 * Math.abs(Math.sin(ang / 22))).toFixed(1) + 'px #56d9c8'
+  document.getElementById('ptot').style.opacity = (0.7 + 0.3 * Math.abs(Math.sin(ang / 30))).toFixed(2)
+}
+var driver = MODE === 'composite' ? frameComposite : MODE === 'paint' ? framePaint : frameStatic
+if (MODE !== 'static') { (function loop (t) { driver(t); requestAnimationFrame(loop) })(0) }
+console.log('MODE ' + MODE)
+</script></body></html>

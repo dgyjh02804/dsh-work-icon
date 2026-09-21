@@ -1,0 +1,37 @@
+{
+  "name": "dsh-work-icon",
+  "version": "1.0.0",
+  "description": "DSH 桌面工作图标：把会话事件归约为 7 个工作状态，经 stdio 推送给原生悬浮窗（宿主侧 / Node 一半）",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "test:e2e": "node test/e2e-electron.mjs"
+  },
+  "files": [
+    "src",
+    "runtime",
+    "docs",
+    "cordis.patch.yml"
+  ],
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "desktop-companion"
+  ],
+  "license": "MIT"
+}

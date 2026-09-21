@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>H2 等离云核 · 七态动效演示</title>
+<style>
+  :root{--bg:#0b0f14;--panel:#121821;--line:#1e2836;--txt:#d7e6f2;--txt2:#8296a8;--txt3:#54667a;
+        --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;--sans:"Microsoft YaHei UI","Segoe UI",system-ui,sans-serif}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);font-family:var(--sans)}
+  body{padding:22px 24px 28px}
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;
+    padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:16px}
+  h1{margin:0;font-size:17px;font-weight:600;letter-spacing:.4px}
+  h1 small{display:block;margin-top:5px;font:400 11px/1.5 var(--mono);color:var(--txt3)}
+  .ctrl{display:flex;gap:8px;align-items:center}
+  button{font:400 11px var(--mono);color:var(--txt2);background:#161d27;border:1px solid var(--line);
+    border-radius:6px;padding:5px 11px;cursor:pointer}
+  button.on{color:#5cffd0;border-color:#27564a;background:#0f1c19}
+  .stage{display:grid;grid-template-columns:230px 1fr;gap:16px;align-items:start}
+  .main{background:#0e131a;border:1px solid var(--line);border-radius:12px;padding:18px;
+    display:flex;flex-direction:column;align-items:center;gap:12px}
+  .main .slot{width:320px;height:320px;border-radius:10px;position:relative;overflow:hidden;background:#0e131a}
+  .main .slot iframe{width:320px;height:320px;border:0;display:block;background:transparent}
+  .main .slot.white{background:#f3f6f9}
+  .main .cap{text-align:center;line-height:1.7}
+  .main .cap b{font-size:15px;font-weight:600}
+  .main .cap span{display:block;font:400 11px var(--mono);color:var(--txt3)}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .card{background:#0e131a;border:1px solid var(--line);border-radius:10px;padding:10px 8px 9px;
+    display:flex;flex-direction:column;align-items:center;gap:8px}
+  .card.white{background:#f3f6f9}
+  .card iframe{width:190px;height:190px;border:0;display:block;background:transparent}
+  .card em{font-style:normal;font-size:12px;color:var(--txt2)}
+  .card i{font-style:normal;font:400 10px/1.45 var(--mono);color:var(--txt3);text-align:center}
+  .card.white em{color:#46586a}.card.white i{color:#6b7d8d}
+  footer{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font:400 11.5px/1.7 var(--sans);color:var(--txt2)}
+  footer b{color:#a9c6d8;font-weight:500}
+</style>
+</head>
+<body>
+<header>
+  <h1>H2「等离云核」· 七态动效演示
+    <small>同源页面 h2-golden.html?state=&amp;size=&amp;bg=&amp;t= · 下方七态为 t=0 冻结帧，左侧大图在切状态</small></h1>
+  <div class="ctrl">
+    <button id="btnDark" class="on">深色底</button>
+    <button id="btnWhite">白色底</button>
+    <button id="btnCycle" class="on">自动循环：开</button>
+  </div>
+</header>
+
+<div class="stage">
+  <div class="main">
+    <div class="slot" id="slot"><iframe id="mainFrame" scrolling="no"></iframe></div>
+    <div class="cap"><b id="capName">空闲 IDLE</b><span id="capInfo">36 粒子 · 60s/圈</span></div>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<footer>
+  <b>用法：</b>上方大图按 2.5s 自动循环七态；七宫格是各状态的 t=0 冻结帧（黄金样本同一渲染器）。
+  <b>注意：</b>演示页里的大图带外发光，发光会溢出到视框之外；<code>h2-golden.html</code> 的导出画面把外发光裁在 200×200 视框内，两者只差边缘一圈。
+</footer>
+
+<script>
+"use strict";
+var ORDER = ['IDLE', 'THINK', 'WORK', 'WAIT', 'OK', 'ERR', 'OFF'];
+var NAME = { IDLE: '空闲 IDLE', THINK: '思考 THINK', WORK: '执行 WORK', WAIT: '待确认 WAIT', OK: '完成 OK', ERR: '出错 ERR', OFF: '离线 OFF' };
+var N = { IDLE: 36, THINK: 62, WORK: 98, WAIT: 52, OK: 98, ERR: 98, OFF: 36 };  /* 第 3 节粒子数 */
+var SEC = { IDLE: 60, THINK: 24, WORK: 6, WAIT: 18, OK: '—', ERR: '—', OFF: '静止' }; /* 第 3 节角速度 */
+var NOTE = { IDLE: '缓慢漂移', THINK: '稳定环绕', WORK: '高速环流', WAIT: '减速·呼吸', OK: '一闪·扩散环', ERR: '抖动 3 次', OFF: '粒子静止' };
+
+var bg = 'dark';
+var cycle = true;
+var idx = 0;
+var timer = null;
+
+function cardHTML(st) {
+  return '<div class="card" data-st="' + st + '">'
+    + '<iframe scrolling="no"></iframe>'
+    + '<em>' + NAME[st] + '</em>'
+    + '<i>' + N[st] + ' 粒子 · ' + SEC[st] + (SEC[st] === '静止' || SEC[st] === '—' ? '' : 's/圈') + '<br>' + NOTE[st] + '</i>'
+    + '</div>';
+}
+function buildGrid() {
+  document.getElementById('grid').innerHTML = ORDER.map(cardHTML).join('');
+}
+/* 只在 URL 真的变了才重设 src：给 iframe 赋同一个 src 会中断正在进行的加载，控制台报 net::ERR_ABORTED */
+function setSrc(frame, url) {
+  if (frame.dataset.src === url) return;
+  frame.dataset.src = url;
+  frame.src = url;
+}
+function paintBg() {
+  document.querySelectorAll('.card').forEach(function (c) {
+    c.classList.toggle('white', bg === 'white');
+    setSrc(c.querySelector('iframe'), 'h2-golden.html?state=' + c.getAttribute('data-st') + '&size=190&bg=' + bg + '&t=0');
+  });
+  document.getElementById('slot').classList.toggle('white', bg === 'white');
+  document.getElementById('btnDark').classList.toggle('on', bg === 'dark');
+  document.getElementById('btnWhite').classList.toggle('on', bg === 'white');
+  loadMain();
+}
+function loadMain() {
+  var st = ORDER[idx];
+  setSrc(document.getElementById('mainFrame'), 'h2-golden.html?state=' + st + '&size=320&bg=' + bg + '&t=0');
+  document.getElementById('capName').textContent = NAME[st];
+  document.getElementById('capInfo').textContent = N[st] + ' 粒子 · ' + SEC[st] + (SEC[st] === '静止' || SEC[st] === '—' ? '' : 's/圈') + ' · ' + NOTE[st];
+}
+/* 大图"活着"：用与 SPEC 相同的角速度做 CSS 旋转（仅视觉演示，不参与黄金样本比对） */
+function startCycle() {
+  if (timer) clearInterval(timer);
+  if (!cycle) return;
+  timer = setInterval(function () { idx = (idx + 1) % ORDER.length; loadMain(); }, 2500);
+}
+
+buildGrid();
+document.getElementById('btnDark').onclick = function () { bg = 'dark'; paintBg(); };
+document.getElementById('btnWhite').onclick = function () { bg = 'white'; paintBg(); };
+document.getElementById('btnCycle').onclick = function () {
+  cycle = !cycle;
+  var b = document.getElementById('btnCycle');
+  b.textContent = '自动循环：' + (cycle ? '开' : '关');
+  b.classList.toggle('on', cycle);
+  startCycle();
+};
+paintBg();
+startCycle();
+</script>
+</body>
+</html>

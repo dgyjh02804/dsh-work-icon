@@ -1,0 +1,54 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>第二批方案 · 静帧对照表（3 个进度点）</title>
+<style>
+ body{font-family:system-ui,"Microsoft YaHei",sans-serif;background:#0d1117;color:#e4ecf4;margin:0;padding:22px 26px;width:1180px}
+ h2{font-size:16px;margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid #23303f}
+ h2 small{color:#8fa8bd;font-size:11px;font-weight:400;margin-left:10px}
+ .strip{display:flex;gap:18px;align-items:flex-start}
+ .cell{background:#33383e;border:1px solid #46505a;border-radius:6px;padding:12px 12px 8px;text-align:center}
+ .cell img{display:block;width:140px;height:140px;image-rendering:auto}
+ .cell div{font:400 10px/16px ui-monospace,Consolas,monospace;color:#cfe0ea;margin-top:6px}
+ .note{font-size:11.5px;line-height:1.8;color:#a9bccd;margin:6px 0 0}
+ .note b{color:#e4ecf4}
+ a{color:#6fb6ff}
+</style></head><body>
+<h2>第二批进度方案 · 静帧对照表 <small>每套 3 个进度点：p=0.05 / p=0.50 / 完成态（换形态）—— 动效请看 <a href="./index.html">index.html</a> 里的活页面</small></h2>
+<p class="note">本页只是<b>静态对照</b>：用于快速比较"形状本身特不特别"。真正的判断请打开活页面看动效（<a href="./ladder.html">ladder</a> · <a href="./azimuth.html">azimuth</a> · <a href="./fan.html">fan</a> · <a href="./moire.html">moire</a>）。</p>
+
+<h2>① LADDER · 姿态地平线 <small>参考：航空姿态仪 attitude indicator —— 动的是基准面，不是指针</small></h2>
+<div class="strip">
+  <div class="cell"><img src="../progress-live2-gen/shot-ladder-05.png" alt=""><div>p = 0.05（刚开始推进）</div></div>
+  <div class="cell"><img src="../progress-live2-gen/shot-ladder-50.png" alt=""><div>p = 0.50（推进中）</div></div>
+  <div class="cell"><img src="../progress-live2-gen/shot-ladder-done.png" alt=""><div>完成态（换形态）</div></div>
+</div></div>
+</div>
+<p class="note">形状要点：圆窗口里唯一在动的是一条<b>带刻度的地平线</b>（密排横线 + 两侧对称小勾 + 两侧数字 + 青/琥珀色域分界）；机翼、中心点、顶部背向刻度全部钉死。完成态＝地面退出、地平线锁中位（"球回正"）。</p>
+
+<h2>② AZIMUTH · 航道罗盘卡 <small>参考：航空 HSI —— 一个圆里两条正交读数轴</small></h2>
+<div class="strip">
+  <div class="cell"><img src="../progress-live2-gen/shot-azimuth-05.png" alt=""><div>p = 0.05（刚开始推进）</div></div>
+  <div class="cell"><img src="../progress-live2-gen/shot-azimuth-50.png" alt=""><div>p = 0.50（推进中）</div></div>
+  <div class="cell"><img src="../progress-live2-gen/shot-azimuth-done.png" alt=""><div>完成态（换形态）</div></div>
+</div></div>
+</div>
+<p class="note">形状要点：<b>会转的罗盘卡</b>（36 分格疏密三档 + N/E/S/W + 琥珀目标箭头）+ <b>会横移的竖直长杆</b>（上下双 V 尖，压着 7 颗航道偏差点）+ 固定 lubber line。两个自由度互不干扰。</p>
+
+<h2>③ FAN · 粒迹扇形 <small>参考：粒子物理事件径迹图（气泡室/火花室）—— 参差是数据的特征</small></h2>
+<div class="strip">
+  <div class="cell"><img src="../progress-live2-gen/shot-fan-05.png" alt=""><div>p = 0.05（刚开始推进）</div></div>
+  <div class="cell"><img src="../progress-live2-gen/shot-fan-50.png" alt=""><div>p = 0.50（推进中）</div></div>
+  <div class="cell"><img src="../progress-live2-gen/shot-fan-done.png" alt=""><div>完成态（换形态）</div></div>
+</div></div>
+</div>
+<p class="note">形状要点：<b>26 根长短不一、带抖动的射线</b>从同一点发散，每根末端一颗像素点，线本身是"根亮末淡"的径向渐变。整体轮廓是不规则星芒，不是圆环也不是规整扇形。完成态＝径迹长到捕获虚线环。</p>
+
+<h2>④ MOIRE · 干涉环场 <small>参考：magic eye 调谐管 / 双光栅摩尔纹 —— 读数由两组周期的差涌现</small></h2>
+<div class="strip">
+  <div class="cell"><img src="../progress-live2-gen/shot-moire-05.png" alt=""><div>p = 0.05（刚开始推进）</div></div>
+  <div class="cell"><img src="../progress-live2-gen/shot-moire-50.png" alt=""><div>p = 0.50（推进中）</div></div>
+  <div class="cell"><img src="../progress-live2-gen/shot-moire-done.png" alt=""><div>完成态（换形态）</div></div>
+</div></div>
+</div>
+<p class="note">形状要点：静态栅 A（9 环 / 步长 9.2）叠动态栅 B（15 环 / 步长 6.05）。进度＝B 整组缩放，即两层周期差。你会看到粗条纹在滑、中心那只"目"随进度长大。完成态＝栅收进圆心后淡出，留实心亮盘。</p>
+
+<p class="note" style="margin-top:22px;color:#7e94ac">⚠️ 生成这一版时视觉后端全部被限流（VISION_UNSUPPORTED_BACKEND），所以<b>我没有用眼睛看过这 4 张图</b>——静帧与动效的"机器可验证部分"（tick 递增、计算样式逐帧变化、像素在两帧之间确实不同）已全部通过，但<b>好不好看必须由你判断</b>。</p>
+</body></html>

@@ -1,0 +1,7 @@
+{
+  "name": "hover-row-harness",
+  "version": "1.0.0",
+  "private": true,
+  "description": "实测：click-through(forward:true) 的窗口能否做「悬停命中某一行」；DOM mousemove 是否真被转发。设计验证用，非生产代码。",
+  "main": "main.js"
+}

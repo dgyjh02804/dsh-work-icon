@@ -1,0 +1,18 @@
+# 换行统一：仓库内一律 LF（检出时不再被自动改成 CRLF，避免无意义的整文件 diff）
+* text=auto eol=lf
+
+# 二进制（禁止换行转换）
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+
+# 脚本：在 Windows 上保持 CRLF 更稳妥的这几类
+*.ps1  text eol=crlf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf

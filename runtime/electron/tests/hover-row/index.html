@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>悬停命中行 实测</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;
+    font-family:system-ui,"Microsoft YaHei",sans-serif;-webkit-user-select:none;user-select:none}
+  #panel{position:absolute;left:0;top:0;width:440px;height:340px;border-radius:6px;
+    background:rgba(16,30,47,.92);border:1px solid #4a7fa8;padding:10px 12px;box-sizing:border-box}
+  .ph{font:400 9px/1 ui-monospace,Consolas,monospace;color:#92aac0;letter-spacing:1.2px;height:14px}
+  .ph b{color:#ffc266}
+  .trow{position:relative;height:22px;line-height:22px;font-size:11px;color:#dbe6f2;white-space:nowrap}
+  .trow[data-hot="1"]{color:#0d1117;background:#56d9c8;border-radius:3px}
+  .ind{display:inline-block;color:#7e94ac}
+  .ico{display:inline-block;width:12px;text-align:center}
+  .d{font:400 9px/1 ui-monospace,Consolas,monospace;color:#92aac0;margin-left:6px}
+  .trow[data-hot="1"] .d{color:#123}
+</style></head><body>
+<div id="panel">
+  <div class="ph">HOVER ROW TEST · 命中行 = <b id="hot">—</b></div>
+  <div class="trow" id="r0"><span class="ico">▸</span>主代理 <span class="d">计划 4/6 · 38s</span></div>
+  <div class="trow" id="r1"><span class="ind"> │ </span><span class="ico">●</span>reviewer <span class="d">跑着 38s</span></div>
+  <div class="trow" id="r2"><span class="ind"> │ </span><span class="ico">✓</span>tester <span class="d">完成</span></div>
+  <div class="trow" id="r3"><span class="ind"> │  └ </span><span class="ico">●</span>子任务A <span class="d">跑着 12s</span></div>
+  <div class="trow" id="r4"><span class="ind"> │     └ </span><span class="ico">○</span>子任务B <span class="d">等待</span></div>
+</div></body></html>

@@ -1,0 +1,103 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>SCHEMATIC · 线框标注</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{width:520px;font-family:system-ui,'Microsoft YaHei',sans-serif;-webkit-font-smoothing:antialiased}
+  .desk{position:relative;width:520px;height:430px;overflow:hidden;
+    background:radial-gradient(130% 90% at 18% 0%,rgba(255,255,255,.055),rgba(255,255,255,0) 62%),
+      linear-gradient(158deg,#41464c 0%,#373c42 44%,#2d3136 100%)}
+  .desk::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px);background-size:24px 24px;opacity:.55}
+  .win{position:absolute}
+  .layer{position:absolute;left:0;top:0}
+  .iconWrap{position:absolute;width:140px;height:140px}
+  .hit{position:absolute;width:140px;height:140px;border-radius:50%;outline:1px dashed rgba(255,255,255,.16)}
+  .actionTag{position:absolute;font-size:9.5px;letter-spacing:.4px;color:#cfd8da;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .thinkflow{font-size:9.5px;letter-spacing:.35px}
+  .costNum{font-size:19px;font-family:Consolas,'DejaVu Sans Mono',monospace;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+  .costNum2{font-size:13px;font-family:Consolas,'DejaVu Sans Mono',monospace;font-variant-numeric:tabular-nums}
+  .unit{font-size:8.5px;letter-spacing:.6px}
+  .cap2{font-size:8.5px;letter-spacing:.7px}
+  .lab{font-size:8px;letter-spacing:.9px;font-family:Consolas,'DejaVu Sans Mono',monospace}
+  .val{font-size:12px;font-family:Consolas,'DejaVu Sans Mono',monospace;font-variant-numeric:tabular-nums}
+  .act{font-size:13px;letter-spacing:2px;font-family:Consolas,'DejaVu Sans Mono',monospace}
+  .act2{font-size:9px;letter-spacing:.4px}
+  .thinkline{font-size:10px;letter-spacing:.2px}
+  .flowline{font-size:11px;letter-spacing:.3px}
+  .cap{width:520px;padding:15px 20px 18px;background:#141618;color:#e8ecee}
+  .cap h3{margin:0 0 7px;font-size:15px;letter-spacing:.5px}
+  .cap h3 .ref{font-size:9.5px;letter-spacing:1px;color:#ffb257;border:1px solid #3d4448;border-radius:3px;padding:1px 6px;margin-left:6px;vertical-align:2px}
+  .cap div{font-size:11.5px;line-height:1.72;color:#b6c0c6}
+  .cap b{color:#eef2f4}
+  .cap .k{display:inline-block;width:62px;color:#7d888f}
+
+  .win{background:linear-gradient(180deg,rgba(11,13,14,.30),rgba(11,13,14,.62));
+    border:1px solid rgba(111,125,127,.55);border-radius:2px}
+  .cap .tag{border-color:#3a4144}</style></head><body>
+<div class="desk">
+  <div class="win" style="width:300px;height:300px;left:110px;top:40px">
+    <svg class="layer" width="300" height="300" viewBox="0 0 300 300">
+      <defs>
+        <linearGradient id="scAxis" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#6f7d7f" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#6f7d7f" stop-opacity="0.05"/>
+        </linearGradient>
+      </defs>
+      <!-- 中轴（贯穿整窗，图标压在轴上，形成"同一个装置"） -->
+      <line x1="150" y1="6" x2="150" y2="294" stroke="url(#scAxis)" stroke-width="1" stroke-dasharray="4 5"/>
+      <!-- 四角括号 -->
+      <path d="M8 20 L8 4 L24 4" fill="none" stroke="#6f7d7f" stroke-width="1.2"/>
+      <path d="M292 20 L292 4 L276 4" fill="none" stroke="#6f7d7f" stroke-width="1.2"/>
+      <path d="M8 280 L8 296 L24 296" fill="none" stroke="#6f7d7f" stroke-width="1.2"/>
+      <path d="M292 280 L292 296 L276 296" fill="none" stroke="#6f7d7f" stroke-width="1.2"/>
+      <!-- 任务：12 格方块槽位 -->
+      <rect x="30" y="252" width="13" height="13" fill="#d9e2e2" fill-opacity="0.75" stroke="#d9e2e2" stroke-width="1.2"/><rect x="51" y="252" width="13" height="13" fill="#d9e2e2" fill-opacity="0.75" stroke="#d9e2e2" stroke-width="1.2"/><rect x="72" y="252" width="13" height="13" fill="#d9e2e2" fill-opacity="0.75" stroke="#d9e2e2" stroke-width="1.2"/><rect x="93" y="252" width="13" height="13" fill="#ffb257" fill-opacity="0.35" stroke="#ffb257" stroke-width="1.2"/><rect x="114" y="252" width="13" height="13" fill="none" fill-opacity="0" stroke="#6f7d7f" stroke-width="1.2"/><rect x="135" y="252" width="13" height="13" fill="none" fill-opacity="0" stroke="#6f7d7f" stroke-width="1.2"/><rect x="156" y="252" width="13" height="13" fill="none" fill-opacity="0" stroke="#6f7d7f" stroke-width="1.2"/><rect x="177" y="252" width="13" height="13" fill="none" fill-opacity="0" stroke="#6f7d7f" stroke-width="1.2"/><rect x="198" y="252" width="13" height="13" fill="none" fill-opacity="0" stroke="#6f7d7f" stroke-width="1.2"/><rect x="219" y="252" width="13" height="13" fill="none" fill-opacity="0" stroke="#6f7d7f" stroke-width="1.2"/><rect x="240" y="252" width="13" height="13" fill="none" fill-opacity="0" stroke="#6f7d7f" stroke-width="1.2"/><rect x="261" y="252" width="13" height="13" fill="none" fill-opacity="0" stroke="#6f7d7f" stroke-width="1.2"/>
+      <line x1="30" y1="280" x2="30" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.9"/><line x1="40" y1="284" x2="40" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="50" y1="284" x2="50" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="60" y1="284" x2="60" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="70" y1="284" x2="70" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="80" y1="280" x2="80" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.9"/><line x1="90" y1="284" x2="90" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="100" y1="284" x2="100" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="110" y1="284" x2="110" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="120" y1="284" x2="120" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="130" y1="280" x2="130" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.9"/><line x1="140" y1="284" x2="140" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="150" y1="284" x2="150" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="160" y1="284" x2="160" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="170" y1="284" x2="170" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="180" y1="280" x2="180" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.9"/><line x1="190" y1="284" x2="190" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="200" y1="284" x2="200" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="210" y1="284" x2="210" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="220" y1="284" x2="220" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="230" y1="280" x2="230" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.9"/><line x1="240" y1="284" x2="240" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="250" y1="284" x2="250" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="260" y1="284" x2="260" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/><line x1="270" y1="284" x2="270" y2="288" stroke="#6f7d7f" stroke-width="1" opacity="0.5"/>
+      <text x="30" y="247" class="lab" fill="#6f7d7f">TASK BUS · 6/12 SLOTS</text>
+      <path d="M84.5 153.6 L46 198 L62 198" fill="none" stroke="#6f7d7f" stroke-width="1"/>
+      <circle cx="84.5" cy="153.6" r="2" fill="#6f7d7f"/>
+      <circle cx="46" cy="198" r="2.4" fill="none" stroke="#ffb257" stroke-width="1.4"/>
+      <text x="67" y="194" text-anchor="start" class="lab" fill="#d9e2e2">COST·SESSION</text>
+      <text x="67" y="206" text-anchor="start" class="val" fill="#ffb257">¥0.428 CNY</text>
+      <path d="M203.3 162.6 L242 224 L226 224" fill="none" stroke="#6f7d7f" stroke-width="1"/>
+      <circle cx="203.3" cy="162.6" r="2" fill="#6f7d7f"/>
+      <circle cx="242" cy="224" r="2.4" fill="none" stroke="#ffb257" stroke-width="1.4"/>
+      <text x="221" y="220" text-anchor="end" class="lab" fill="#d9e2e2">TOKENS·IN/OUT</text>
+      <text x="221" y="232" text-anchor="end" class="val" fill="#ffb257">128.4k</text>
+      <text x="150" y="172" text-anchor="middle" class="act" fill="#d9e2e2">BASH</text>
+      <text x="150" y="186" text-anchor="middle" class="act2" fill="#6f7d7f">run-all --with-shown</text>
+      <text x="30" y="208" class="lab" fill="#6f7d7f">THINK·TAIL · 2 LINE CLAMP</text>
+      <text x="30" y="222" class="thinkline" fill="#d9e2e2">正在确认 config 分支的字段顺序，宿主回发的 wind…</text>
+      <text x="30" y="236" class="thinkline" fill="#d9e2e2" opacity="0.72">ow.fps 有没有被 cleanWindow 收下，再核对…</text>
+    </svg>
+    <div class="iconWrap" style="left:80px;top:8px"><svg width="140" height="140" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="pls" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#050809" stop-opacity="0.88"/>
+      <stop offset="78%" stop-color="#050809" stop-opacity="0.52"/>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="sfs" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="12"/></filter>
+  </defs>
+  <circle cx="100" cy="100" r="97" fill="url(#pls)"/>
+  <circle cx="100" cy="100" r="94" fill="none" stroke="#6f7d7f" stroke-width="1" stroke-dasharray="1.5 7"/>
+  <g><circle cx="20.05" cy="61.83" r="0.86" fill="#d9e2e2" opacity="0.264"/><circle cx="33.47" cy="137.17" r="0.88" fill="#d9e2e2" opacity="0.275"/><circle cx="144.47" cy="31.51" r="0.89" fill="#d9e2e2" opacity="0.279"/><circle cx="100.44" cy="186.46" r="0.89" fill="#d9e2e2" opacity="0.280"/><circle cx="78.41" cy="174.30" r="0.90" fill="#d9e2e2" opacity="0.285"/><circle cx="168.60" cy="150.06" r="0.94" fill="#d9e2e2" opacity="0.305"/><circle cx="28.05" cy="92.20" r="0.99" fill="#d9e2e2" opacity="0.330"/><circle cx="102.76" cy="171.57" r="1.05" fill="#d9e2e2" opacity="0.361"/><circle cx="121.77" cy="178.40" r="1.07" fill="#d9e2e2" opacity="0.367"/><circle cx="29.61" cy="70.45" r="1.07" fill="#d9e2e2" opacity="0.371"/><circle cx="47.13" cy="164.40" r="1.08" fill="#d9e2e2" opacity="0.373"/><circle cx="14.94" cy="130.80" r="1.08" fill="#d9e2e2" opacity="0.374"/><circle cx="160.47" cy="165.13" r="1.11" fill="#d9e2e2" opacity="0.387"/><circle cx="168.27" cy="64.98" r="1.12" fill="#d9e2e2" opacity="0.391"/><circle cx="26.91" cy="151.80" r="1.13" fill="#d9e2e2" opacity="0.397"/><circle cx="36.84" cy="41.89" r="1.14" fill="#d9e2e2" opacity="0.401"/><circle cx="103.85" cy="27.32" r="1.14" fill="#d9e2e2" opacity="0.405"/><circle cx="170.56" cy="44.99" r="1.16" fill="#d9e2e2" opacity="0.412"/><circle cx="125.22" cy="21.90" r="1.16" fill="#d9e2e2" opacity="0.414"/><circle cx="185.86" cy="110.18" r="1.16" fill="#d9e2e2" opacity="0.415"/><circle cx="139.29" cy="37.06" r="1.21" fill="#d9e2e2" opacity="0.437"/><circle cx="14.09" cy="72.93" r="1.23" fill="#d9e2e2" opacity="0.446"/><circle cx="86.13" cy="181.60" r="1.23" fill="#d9e2e2" opacity="0.446"/><circle cx="135.53" cy="26.51" r="1.24" fill="#d9e2e2" opacity="0.453"/><circle cx="27.82" cy="152.40" r="1.28" fill="#d9e2e2" opacity="0.472"/><circle cx="111.97" cy="17.87" r="1.29" fill="#d9e2e2" opacity="0.477"/><circle cx="18.68" cy="83.61" r="1.29" fill="#d9e2e2" opacity="0.477"/><circle cx="93.92" cy="173.42" r="1.30" fill="#d9e2e2" opacity="0.483"/><circle cx="64.80" cy="28.75" r="1.31" fill="#d9e2e2" opacity="0.489"/><circle cx="178.27" cy="71.98" r="1.32" fill="#d9e2e2" opacity="0.493"/><circle cx="88.20" cy="25.44" r="1.33" fill="#d9e2e2" opacity="0.495"/><circle cx="176.29" cy="65.75" r="1.33" fill="#d9e2e2" opacity="0.498"/><circle cx="141.02" cy="177.23" r="1.35" fill="#d9e2e2" opacity="0.508"/><circle cx="57.15" cy="35.25" r="1.36" fill="#d9e2e2" opacity="0.510"/><circle cx="27.08" cy="138.03" r="1.36" fill="#d9e2e2" opacity="0.513"/><circle cx="179.73" cy="96.57" r="1.36" fill="#d9e2e2" opacity="0.513"/><circle cx="18.07" cy="105.60" r="1.38" fill="#d9e2e2" opacity="0.522"/><circle cx="165.41" cy="47.54" r="1.39" fill="#d9e2e2" opacity="0.524"/><circle cx="188.31" cy="115.36" r="1.39" fill="#d9e2e2" opacity="0.525"/><circle cx="93.44" cy="183.50" r="1.40" fill="#d9e2e2" opacity="0.529"/><circle cx="173.31" cy="56.20" r="1.40" fill="#d9e2e2" opacity="0.532"/><circle cx="177.46" cy="121.04" r="1.43" fill="#d9e2e2" opacity="0.548"/><circle cx="174.71" cy="130.33" r="1.45" fill="#d9e2e2" opacity="0.555"/><circle cx="35.73" cy="51.15" r="1.46" fill="#d9e2e2" opacity="0.562"/><circle cx="23.16" cy="135.48" r="1.50" fill="#d9e2e2" opacity="0.579"/><circle cx="174.14" cy="71.61" r="1.50" fill="#d9e2e2" opacity="0.581"/><circle cx="97.53" cy="21.28" r="1.51" fill="#d9e2e2" opacity="0.586"/><circle cx="187.68" cy="74.41" r="1.52" fill="#d9e2e2" opacity="0.592"/><circle cx="75.70" cy="26.01" r="1.54" fill="#d9e2e2" opacity="0.603"/><circle cx="53.10" cy="29.85" r="1.57" fill="#d9e2e2" opacity="0.614"/><circle cx="157.92" cy="35.35" r="1.58" fill="#d9e2e2" opacity="0.619"/><circle cx="140.94" cy="168.50" r="1.61" fill="#d9e2e2" opacity="0.634"/><circle cx="138.43" cy="172.24" r="1.62" fill="#d9e2e2" opacity="0.638"/><circle cx="48.71" cy="161.02" r="1.64" fill="#d9e2e2" opacity="0.648"/><circle cx="64.19" cy="169.68" r="1.66" fill="#d9e2e2" opacity="0.660"/><circle cx="41.81" cy="146.21" r="1.67" fill="#d9e2e2" opacity="0.665"/><circle cx="180.02" cy="141.98" r="1.68" fill="#d9e2e2" opacity="0.669"/><circle cx="180.01" cy="96.12" r="1.71" fill="#d9e2e2" opacity="0.684"/><circle cx="121.29" cy="174.41" r="1.72" fill="#d9e2e2" opacity="0.689"/><circle cx="35.44" cy="58.49" r="1.75" fill="#d9e2e2" opacity="0.704"/><circle cx="173.77" cy="80.70" r="1.75" fill="#d9e2e2" opacity="0.705"/><circle cx="154.15" cy="49.58" r="1.76" fill="#d9e2e2" opacity="0.709"/><circle cx="148.92" cy="150.88" r="1.79" fill="#d9e2e2" opacity="0.726"/><circle cx="181.71" cy="133.74" r="1.83" fill="#d9e2e2" opacity="0.744"/><circle cx="177.54" cy="131.68" r="1.83" fill="#d9e2e2" opacity="0.744"/><circle cx="90.24" cy="181.55" r="1.84" fill="#d9e2e2" opacity="0.750"/><circle cx="51.93" cy="169.80" r="1.85" fill="#d9e2e2" opacity="0.752"/><circle cx="147.21" cy="166.04" r="1.90" fill="#d9e2e2" opacity="0.776"/><circle cx="25.50" cy="60.81" r="1.90" fill="#d9e2e2" opacity="0.777"/><circle cx="60.18" cy="22.95" r="1.91" fill="#d9e2e2" opacity="0.783"/><circle cx="14.39" cy="119.60" r="1.91" fill="#d9e2e2" opacity="0.784"/><circle cx="177.47" cy="114.48" r="1.92" fill="#d9e2e2" opacity="0.788"/><circle cx="134.80" cy="22.39" r="1.92" fill="#d9e2e2" opacity="0.789"/><circle cx="52.20" cy="168.14" r="1.93" fill="#d9e2e2" opacity="0.795"/><circle cx="173.17" cy="137.94" r="1.93" fill="#d9e2e2" opacity="0.795"/><circle cx="49.35" cy="166.31" r="1.95" fill="#d9e2e2" opacity="0.801"/><circle cx="83.36" cy="184.96" r="1.98" fill="#d9e2e2" opacity="0.818"/><circle cx="59.56" cy="177.36" r="2.01" fill="#d9e2e2" opacity="0.830"/><circle cx="38.47" cy="38.36" r="2.01" fill="#d9e2e2" opacity="0.833"/><circle cx="127.17" cy="25.76" r="2.02" fill="#d9e2e2" opacity="0.837"/><circle cx="26.70" cy="54.06" r="2.04" fill="#d9e2e2" opacity="0.845"/><circle cx="142.51" cy="30.99" r="2.05" fill="#d9e2e2" opacity="0.850"/><circle cx="51.12" cy="45.00" r="2.05" fill="#d9e2e2" opacity="0.851"/><circle cx="109.77" cy="14.07" r="2.08" fill="#d9e2e2" opacity="0.865"/><circle cx="101.37" cy="179.82" r="2.12" fill="#d9e2e2" opacity="0.887"/><circle cx="33.08" cy="43.24" r="2.12" fill="#d9e2e2" opacity="0.888"/><circle cx="56.32" cy="32.63" r="2.13" fill="#d9e2e2" opacity="0.890"/><circle cx="94.57" cy="22.62" r="2.16" fill="#d9e2e2" opacity="0.908"/><circle cx="14.53" cy="79.75" r="2.18" fill="#d9e2e2" opacity="0.914"/><circle cx="20.07" cy="138.70" r="2.18" fill="#d9e2e2" opacity="0.915"/><circle cx="118.98" cy="183.16" r="2.18" fill="#d9e2e2" opacity="0.915"/><circle cx="16.31" cy="114.64" r="2.24" fill="#d9e2e2" opacity="0.944"/><circle cx="82.77" cy="20.57" r="2.24" fill="#d9e2e2" opacity="0.944"/><circle cx="183.06" cy="119.67" r="2.24" fill="#d9e2e2" opacity="0.947"/><circle cx="171.85" cy="56.45" r="2.25" fill="#d9e2e2" opacity="0.949"/><circle cx="178.31" cy="56.61" r="2.34" fill="#d9e2e2" opacity="0.994"/><circle cx="185.98" cy="76.88" r="2.34" fill="#d9e2e2" opacity="0.997"/><circle cx="184.42" cy="65.82" r="2.34" fill="#d9e2e2" opacity="0.997"/></g>
+  <circle cx="100" cy="100" r="60" fill="none" stroke="#d9e2e2" stroke-width="2" stroke-dasharray="40 16 8 16" stroke-linecap="round"/>
+  <circle cx="100" cy="100" r="48" fill="none" stroke="#6f7d7f" stroke-width="1"/>
+  <circle cx="100" cy="100" r="44" fill="#d9e2e2" opacity="0.2" filter="url(#sfs)"/>
+  <path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="#d9e2e2" stroke-width="2.6" stroke-linejoin="round"/>
+  <circle cx="100" cy="100" r="12" fill="#d9e2e2"/>
+</svg></div>
+    <div class="hit" style="left:80px;top:8px"></div>
+  </div></div>
+<div class="cap">
+  <h3>SCHEMATIC · 线框标注 <span class="ref">流派参照</span></h3>
+  <div><span class="k">流派参照</span>军用/航天线框 HUD 与工程标注 —— 《Alien》(1979) Nostromo 的单色 CRT（Syd Mead / Ron Cobb 语汇）· 《Interstellar》(2014, DNEG) 刻意"反全息"的实体仪表 · 《Star Citizen》座舱 HUD · 《Halo》ONI 线框界面。借的是"引线+角标+刻度"的工程图纸语法。</div>
+  <div><span class="k">尺寸</span>面板 300 × 200（窗口 300 × 300）</div>
+  <div><span class="k">配色 5</span>#0b0d0e 石墨 / #d9e2e2 主文 / #6f7d7f 细线 / #ffb257 数据 / #ffffff 强调</div>
+  <div><span class="k">字体</span>等宽（全部，Consolas/DejaVu Sans Mono）</div>
+  <div><span class="k">同构技法</span>工程图语法：中心虚线轴 + 四角括号 + 引线从图标外环拉到数据锚点 + 底部刻度尺 + 12 格任务槽位</div>
+  <div><span class="k">动效</span>引线端点 0.5Hz 微脉动 · 任务方块逐个点亮 · 刻度尺游标随花费右移</div>
+  <div><span class="k">可行性</span>✅ 可做，风险低但**最怕花壁纸**：1px 细线在杂乱背景上会消失，必须压一层 ≥45% 的暗底。文字最少，抗小尺寸能力最强。</div>
+</div>
+</body></html>

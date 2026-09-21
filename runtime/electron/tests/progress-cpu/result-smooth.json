@@ -1,0 +1,29 @@
+{
+  "tier": "smooth",
+  "scenarios": {
+    "idle": {
+      "cpu": 0.72,
+      "peak": "0.77",
+      "memMB": 376,
+      "n": 9
+    },
+    "panel": {
+      "cpu": 0.79,
+      "peak": "0.88",
+      "memMB": 371,
+      "n": 10
+    },
+    "advance": {
+      "cpu": 1.02,
+      "peak": "1.13",
+      "memMB": 400,
+      "n": 9
+    },
+    "complete": {
+      "cpu": 1.1,
+      "peak": "1.75",
+      "memMB": 435,
+      "n": 9
+    }
+  }
+}

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>进度条动效 CPU 实测</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;background:transparent;overflow:hidden;
+    font-family:system-ui,"Microsoft YaHei",sans-serif;-webkit-user-select:none;user-select:none}
+  #wrap{position:absolute;inset:0}
+  #ico{position:absolute;left:160px;top:24px;width:140px;height:140px}
+  /* 悬浮层：状态 + token + 总进度条 + 进程数 */
+  #hover{position:absolute;left:100px;top:172px;width:260px;padding:8px 11px;border-radius:6px;
+    background:rgba(16,30,47,.90);border:1px solid #4a7fa8}
+  .h1{height:14px;line-height:14px;white-space:nowrap}
+  .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#56d9c8;margin-right:6px;vertical-align:1px}
+  .st{font-size:12px;color:#e8f0fa;font-weight:600}
+  .tok{float:right;font:400 9.5px/14px ui-monospace,Consolas,monospace;color:#92aac0}
+  .h2{height:14px;line-height:14px;margin-top:3px;white-space:nowrap}
+  .pc{font:400 8.5px/1 ui-monospace,Consolas,monospace;color:#92aac0;margin-left:7px}
+  .h3{height:12px;line-height:12px;font-size:9px;color:#a8c4dc;white-space:nowrap;overflow:hidden}
+  .warn{color:#ffc266}
+  /* 完整面板：多条条 */
+  #panel{position:absolute;left:40px;top:242px;width:380px;padding:10px 12px;border-radius:6px;display:none;
+    background:rgba(16,30,47,.86);border:1px solid #4a7fa8}
+  .ph{height:13px;line-height:13px;font:400 8.5px/1 ui-monospace,Consolas,monospace;color:#92aac0;letter-spacing:1.2px}
+  .ph .he{float:right;letter-spacing:0}
+  .conv{margin-top:6px;padding-left:8px;border-left:2px solid #2f4a63}
+  .crow{height:14px;line-height:14px}
+  .ct{font-size:10.5px;color:#dbe6f2}
+  .cn{float:right;font:400 10px/14px ui-monospace,Consolas,monospace;color:#e8f0fa}
+  .cn2{font:400 8.5px/12px ui-monospace,Consolas,monospace;color:#ffc266;height:12px}
+  svg{display:block}
+</style></head><body>
+<div id="wrap">
+  <div id="ico"></div>
+  <div id="hover">
+    <div class="h1"><span class="dot"></span><span class="st">执行中 · Bash</span><span class="tok">128.4k tok</span></div>
+    <div class="h2"><span id="hbar"></span><span class="pc">主 + 2 子</span></div>
+    <div class="h3">总进度 <b id="hnum">4/6 计划</b>　<span class="warn">子代理 2 已更新计划 6→11</span></div>
+  </div>
+  <div id="panel">
+    <div class="ph">CONVERSATIONS · 3<span class="he" id="ptot">总 4/6</span></div>
+    <div id="pbars"></div>
+  </div>
+</div>
+<script>
+var Q = new URLSearchParams(location.search)
+var TIER = Q.get('tier') || 'standard'
+/* ===== 三档「资源剖面」（这条就是给用户挑的东西）===== */
+var PROFILE = {
+  eco:      { fps: 0,  sustain: false, particles: 12, scan: false, glow: 0.0, thinkHz: 1, name: '省电' },
+  standard: { fps: 10, sustain: true,  particles: 26, scan: false, glow: 0.35, thinkHz: 3, name: '标准' },
+  smooth:   { fps: 30, sustain: true,  particles: 42, scan: true,  glow: 1.0, thinkHz: 6, name: '流畅' }
+}
+var P = PROFILE[TIER] || PROFILE.standard
+var N = 3                                  /* 并发对话数 */
+var state = { p: [0.67, 0.42, 0.28], burst: 0, phase: 0 }
+
+/* ---- H2 图标 ---- */
+;(function icon () {
+  var s = '', rnd = (function () { var x = 90210; return function () { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296 } })()
+  for (var i = 0; i < 98; i++) {
+    var th = rnd() * 6.283, r = 72 + 20 * Math.sqrt(rnd()), z = rnd()
+    s += '<circle cx="' + (100 + Math.cos(th) * r).toFixed(1) + '" cy="' + (100 + Math.sin(th) * r * 0.94).toFixed(1) + '" r="' + (0.85 + z * 1.5).toFixed(2) + '" fill="#56d9c8" opacity="' + (0.26 + 0.74 * z).toFixed(2) + '"/>'
+  }
+  document.getElementById('ico').innerHTML =
+    '<svg width="140" height="140" viewBox="0 0 200 200"><defs><radialGradient id="pg" cx="50%" cy="50%" r="50%">' +
+    '<stop offset="0%" stop-color="#07121d" stop-opacity=".92"/><stop offset="78%" stop-color="#07121d" stop-opacity=".56"/>' +
+    '<stop offset="100%" stop-color="#07121d" stop-opacity="0"/></radialGradient></defs>' +
+    '<circle cx="100" cy="100" r="97" fill="url(#pg)"/><circle cx="100" cy="100" r="94" fill="none" stroke="#3f6f86" stroke-width="1" stroke-dasharray="1.5 7"/>' +
+    '<g id="cloud">' + s + '</g>' +
+    '<circle id="ring" cx="100" cy="100" r="60" fill="none" stroke="#56d9c8" stroke-width="2" stroke-dasharray="40 16 8 16" stroke-linecap="round"/>' +
+    '<circle cx="100" cy="100" r="48" fill="none" stroke="#3f6f86" stroke-width="1"/>' +
+    '<path d="M100 70 L126 116 L74 116 Z" fill="none" stroke="#56d9c8" stroke-width="2.6" stroke-linejoin="round"/>' +
+    '<circle cx="100" cy="100" r="12" fill="#56d9c8"/></svg>'
+})()
+
+/* ---- 进度条：粒子流（B 方案；粒子数随档位变）---- */
+function particleBar (w, h, p, seed, live) {
+  var rnd = (function () { var x = seed >>> 0; return function () { x = (x * 1664525 + 1013904223) >>> 0; return x / 4294967296 } })()
+  var head = 0.12 + 0.78 * p, out = ''
+  for (var i = 0; i < P.particles; i++) {
+    var t = i / (P.particles - 1)
+    var spread = t < head ? 0.9 : 0.25
+    var x = t * (w - 6) + 3 + (rnd() - 0.5) * 3
+    var y = h / 2 + (rnd() - 0.5) * h * spread
+    var near = Math.max(0, 1 - Math.abs(t - head) * 9)
+    var rr = (0.7 + rnd() * 0.8 + near * (1.3 + state.burst * 2.2)).toFixed(2)
+    var op = (0.16 + 0.5 * t * (t < head ? 1 : 0.35) + near * (0.5 + state.burst * 0.5)).toFixed(2)
+    out += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + rr + '" fill="' + (t < head ? '#56d9c8' : '#92aac0') + '" opacity="' + op + '"/>'
+  }
+  return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' + out + '</svg>'
+}
+
+/* ---- 渲染 ---- */
+var hbar = document.getElementById('hbar'), pbars = document.getElementById('pbars')
+function draw () {
+  var sk = P.sustain ? 1 : (state.dirty ? 1 : 0)      /* 省电档：只有数值变化那一帧才重画 */
+  if (sk) {
+    hbar.innerHTML = particleBar(170, 9, state.p[0] * 0.9 + 0.05, 11, true)
+    var html = ''
+    for (var i = 0; i < N; i++) {
+      html += '<div class="conv"><div class="crow"><span class="ct">会话 ' + (i + 1) + '</span><span class="cn">计划 ' +
+        Math.round(state.p[i] * 8) + '/8</span></div>' + particleBar(300, 7, state.p[i], 31 + i * 7, true) +
+        '<div class="cn2">' + (i === 1 ? '▲ 计划已更新 6→11' : '') + '</div></div>'
+    }
+    pbars.innerHTML = html
+  }
+  state.dirty = false
+}
+
+/* ---- 驱动：按档位帧率跑；0 fps = 只在数值变化时更新 ---- */
+var last = 0, acc = 0
+function tick (now) {
+  var budget = P.fps > 0 ? 1000 / P.fps : 1000
+  if (now - last >= budget) {
+    last = now
+    state.phase += 0.06
+    /* 图标：三档都让核心有极轻的呼吸（省电档也保留一点"活着"，但只改一个属性） */
+    var breathe = P.sustain ? 0.5 + 0.5 * Math.sin(state.phase * (TIER === 'smooth' ? 1.6 : 0.7)) : 0
+    var ring = document.getElementById('ring')
+    if (ring) ring.setAttribute('opacity', (0.72 + 0.2 * breathe).toFixed(2))
+    if (P.sustain && P.glow > 0) {
+      var cl = document.getElementById('cloud')
+      if (cl) cl.setAttribute('transform', 'rotate(' + (state.phase * (TIER === 'smooth' ? 1.2 : 0.4) * 6).toFixed(1) + ' 100 100)')
+    }
+    /* 完成瞬间的爆开（衰减） */
+    if (state.burst > 0) { state.burst = Math.max(0, state.burst - 0.12); state.dirty = true; draw() }
+    else if (state.advancing) {
+      for (var i = 0; i < N; i++) {
+        state.p[i] = Math.min(1, state.p[i] + (TIER === 'eco' ? 0.004 : 0.002))
+        if (state.p[i] >= 1) { state.p[i] = 0; state.burst = 1 }
+      }
+      state.dirty = true; draw()
+    }
+    if (!P.sustain && state.dirty) draw()
+  }
+  requestAnimationFrame(tick)
+}
+requestAnimationFrame(tick)
+
+/* ---- 情形时间轴（与 main.js 的采样窗口对齐）---- */
+var DUR = 4000
+setTimeout(function () {                                   /* 0-4s：idle 悬浮层静止 */
+  console.log('SCEN idle')
+}, 0)
+setTimeout(function () {                                   /* 4-8s：完整面板 */
+  document.getElementById('panel').style.display = 'block'; console.log('SCEN panel')
+}, DUR)
+setTimeout(function () {                                   /* 8-12s：进度推进 */
+  state.advancing = true; console.log('SCEN advance')
+}, 2 * DUR)
+setTimeout(function () {                                   /* 12-16s：完成瞬间（每 1.2s 复现） */
+  setInterval(function () { state.burst = 1; state.dirty = true }, 1200)
+  console.log('SCEN complete')
+}, 3 * DUR)
+draw()
+</script></body></html>

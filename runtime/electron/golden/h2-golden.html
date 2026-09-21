@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>H2 等离云核 · 黄金样本</title>
+<style>
+  html,body{margin:0;padding:0;background:transparent;overflow:hidden}
+  #gl{display:block}
+  #gl[data-bg="dark"]{background:#111111}
+  #gl[data-bg="white"]{background:#ffffff}
+</style>
+</head>
+<body>
+<svg id="gl" width="240" height="240" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet" data-bg="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="plateGrad">
+      <stop offset="0%" stop-color="#050809" stop-opacity="0.86"></stop>
+      <stop offset="82%" stop-color="#050809" stop-opacity="0.5"></stop>
+      <stop offset="100%" stop-color="#050809" stop-opacity="0"></stop>
+    </radialGradient>
+    <filter id="soft2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="11"></feGaussianBlur></filter>
+    <filter id="glowF" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgb(0,0,0)" flood-opacity="0"></feDropShadow></filter>
+  </defs>
+  <!-- L1 能量底盘 r=97 -->
+  <circle id="plate" cx="100" cy="100" r="97" fill="url(#plateGrad)"></circle>
+  <!-- L2 刻度环 r=94 -->
+  <circle cx="100" cy="100" r="94" fill="none" stroke="var(--c2)" stroke-width="1" stroke-dasharray="1.5 7"></circle>
+  <!-- L3 等离子云 r∈[R0,R1] 环带 -->
+  <g id="cloud"></g>
+  <!-- L4 分段环 r=60 -->
+  <g id="spinSeg"><circle cx="100" cy="100" r="60" fill="none" stroke="var(--c1)" stroke-width="2" stroke-dasharray="40 16 8 16" stroke-linecap="round"></circle></g>
+  <!-- L5 内细环 r=48 -->
+  <circle cx="100" cy="100" r="48" fill="none" stroke="var(--c2)" stroke-width="1"></circle>
+  <!-- L6 核心辉光 r=44 -->
+  <circle id="coreGlow" cx="100" cy="100" r="44" fill="var(--c1)" opacity="0.2" filter="url(#soft2)"></circle>
+  <!-- OK 的一次性扩散环 -->
+  <g id="burst" opacity="0"></g>
+  <!-- L7 核心（三角 + 中心圆），抖动/闪烁容器 -->
+  <g id="coreWrap">
+    <path d="M100,70 L126,116 L74,116 Z" fill="none" stroke="var(--c1)" stroke-width="2.6" stroke-linejoin="round" opacity="1"></path>
+    <circle cx="100" cy="100" r="12" fill="var(--c1)" opacity="1"></circle>
+  </g>
+</svg>
+<script>
+"use strict";
+/* ============================================================
+   H2「等离云核」黄金样本渲染器
+   事实来源：docs/SPEC-H2.md（第2/3/4节）+ hybrid.html 的 base-h2 与 halo()
+   URL: ?state=WORK&size=240&bg=none|dark|white&t=0&fx=1|0&glow=1|0&plate=1|0&dist=disk|annulus
+   ============================================================ */
+var Q = new URLSearchParams(location.search);
+var STATE = (Q.get('state') || 'WORK').toUpperCase();
+var SIZE  = Math.max(16, Math.min(2048, parseFloat(Q.get('size') || '240')));
+var BG    = (Q.get('bg') || 'none').toLowerCase();
+var T     = parseFloat(Q.get('t') || '0');            // 动画时间(秒)，冻结相位
+var FX    = Q.get('fx') !== '0';                      // OK 爆闪/扩散环、ERR 抖动、WAIT 脉冲
+var GLOW  = Q.get('glow') !== '0';                    // 状态外发光
+var PLATE = Q.get('plate') !== '0';                   // L1 能量底盘
+/* 粒子分布：
+ *   disk    = 现状，照抄 hybrid.html 的 halo()：球壳的球面投影，落到平面上自然是**实心圆盘**，
+ *             所以 SPEC 第 3 节写的 "r∈[R0,R1] 环带" 在参考实现下无法达成（实测带内仅 27.8%~40.3%）。
+ *   annulus = 2D 环带：半径在 [R0,R1] 内均匀采样、角度均匀，半径不再被 cosθ 压缩 -> 带内 100%。
+ *             深度 z 由半径反推（越靠外越"远"），继续驱动 SPEC 第 3 节的 r/透明度分层：
+ *               z = √(1-(r/R1)²)， r=R0 -> 0.62，r=R1 -> 0
+ *             注意 annulus 不做 y 轴 0.94 压扁（那是 3D 球壳才需要的透视补偿），环带保持正圆。
+ * 默认 disk，不改变既有 23 张黄金样本的行为。 */
+var DIST  = (Q.get('dist') || 'disk').toLowerCase();
+if (DIST !== 'annulus') DIST = 'disk';
+
+/* ---------- 第 4 节 七态配色表（逐项照抄，不得优化） ---------- */
+var ST = {
+  IDLE : { c1:'#3d7688', c2:'#1b3b47', glow:'rgba(80,190,220,.20)',  core:0.13 },
+  THINK: { c1:'#38e8ff', c2:'#176c85', glow:'rgba(56,232,255,.55)',  core:0.42 },
+  WORK : { c1:'#5cffd0', c2:'#128f78', glow:'rgba(92,255,208,.62)',  core:1.00 },
+  WAIT : { c1:'#ffb340', c2:'#a35a08', glow:'rgba(255,179,64,.62)',  core:0.55 },
+  OK   : { c1:'#8dffae', c2:'#1f9b5a', glow:'rgba(141,255,174,.55)', core:1.00 },
+  ERR  : { c1:'#ff4d6d', c2:'#8e0f2a', glow:'rgba(255,77,109,.62)',  core:0.70 },
+  OFF  : { c1:'#5a636e', c2:'#2b3138', glow:'rgba(140,150,160,.16)', core:0.20 }
+};
+/* ---------- 第 3 节 粒子数 / 半径带 / 角速度（逐项照抄） ---------- */
+var PT = {
+  IDLE : { n:36, R:[80,96], period:60, rot:true  },
+  THINK: { n:62, R:[76,94], period:24, rot:true  },
+  WORK : { n:98, R:[72,92], period:6,  rot:true  },
+  WAIT : { n:52, R:[80,97], period:18, rot:true  },
+  OK   : { n:98, R:[72,92], period:0,  rot:false },   // OK：一次性闪光/扩散环，无环流（SPEC 第4节未列角速度）
+  ERR  : { n:98, R:[72,92], period:0,  rot:false },   // ERR：抖动 3 次，无环流（同上）
+  OFF  : { n:36, R:[80,96], period:0,  rot:false }    // 第 4 节：粒子静止，无旋转
+};
+var sp = ST[STATE] || ST.WORK, pp = PT[STATE] || PT.WORK;
+var svg = document.getElementById('gl');
+
+/* ---------- 尺寸 / 背景 ---------- */
+svg.setAttribute('width', String(SIZE));
+svg.setAttribute('height', String(SIZE));
+svg.setAttribute('data-bg', (BG === 'dark' || BG === 'white') ? BG : 'none');
+document.documentElement.style.width = SIZE + 'px';
+document.documentElement.style.height = SIZE + 'px';
+document.body.style.width = SIZE + 'px';
+document.body.style.height = SIZE + 'px';
+
+/* ---------- 颜色写入 CSS 变量 ---------- */
+svg.style.setProperty('--c1', sp.c1);
+svg.style.setProperty('--c2', sp.c2);
+svg.style.filter = GLOW ? ('drop-shadow(0 0 10px ' + sp.glow + ')') : 'none';
+document.getElementById('plate').setAttribute('opacity', PLATE ? '1' : '0');
+document.getElementById('coreGlow').setAttribute('opacity', String(sp.core * 0.2));
+svg.querySelectorAll('#coreWrap > *').forEach(function (e) { e.setAttribute('opacity', String(sp.core)); });
+
+/* ---------- 确定性伪随机（与 hybrid.html 同族 LCG） ---------- */
+function makeRnd(seed) {
+  var s = seed >>> 0 || 1;
+  return function () { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+}
+/* halo()：hybrid.html 参考实现 —— 球面投影(x=100+rad·sinφ'·cosθ, y=100+rad·u·0.94, z=(sinθ·sinφ'+1)/2)
+   注意：z 直接由分布方位推出，不是独立随机数。这是"球面投影"的自然结果，照抄不改。
+   （球壳正交投影 -> 实心圆盘；带内占比达不到 SPEC 第3节的环带要求，见 dist=annulus。） */
+function halo(rnd, R) {
+  var u = rnd() * 2 - 1, th = rnd() * Math.PI * 2, s = Math.sqrt(1 - u * u);
+  var rad = R[0] + rnd() * (R[1] - R[0]);
+  var x = 100 + rad * s * Math.cos(th), y = 100 + rad * u * 0.94;
+  var z = (Math.sin(th) * s + 1) / 2;
+  return { x: x, y: y, z: z };
+}
+/* ring()：2D 环带分布 —— 半径严格落在 [R0,R1]、角度均匀，半径不被 cosθ 压缩。
+   z 由半径反推：z = √(1-(r/R1)²)，整体落在 [0.62, 1]（R=[72,92] 时），
+   再喂给 SPEC 第3节的 r=0.85+z×1.5 与 opacity=0.26+0.74×z，做出"环内侧更亮更大、外侧更黯更小"的层次。 */
+function ring(rnd, R) {
+  var r = R[0] + rnd() * (R[1] - R[0]);
+  var th = rnd() * Math.PI * 2;
+  var ratio = Math.min(0.999, r / R[1]);
+  var z = Math.sqrt(1 - ratio * ratio);
+  return { x: 100 + r * Math.cos(th), y: 100 + r * Math.sin(th), z: z };
+}
+var GEOM = DIST === 'annulus' ? ring : halo;
+/* ---------- L3 粒子填充 ---------- */
+(function buildCloud() {
+  var cloud = document.getElementById('cloud');
+  var rnd = makeRnd(90210 + 777 + STATE.charCodeAt(0) * 131);
+  var ps = [], i, p;
+  for (i = 0; i < pp.n; i++) { p = GEOM(rnd, pp.R); ps.push(p); }
+  ps.sort(function (a, b) { return a.z - b.z; });          // 深→浅，浅色压在深色之上
+  var NS = 'http://www.w3.org/2000/svg';
+  for (i = 0; i < ps.length; i++) {
+    var c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', ps[i].x.toFixed(1));
+    c.setAttribute('cy', ps[i].y.toFixed(1));
+    c.setAttribute('r', (0.85 + ps[i].z * 1.5).toFixed(2));
+    c.setAttribute('fill', 'var(--c1)');
+    c.setAttribute('opacity', (0.26 + 0.74 * ps[i].z).toFixed(2));
+    cloud.appendChild(c);
+  }
+  window.__particles = ps;
+  /* 供测量脚本读：本帧粒子相对中心的真实半径（annulus 不做 y 压缩，disk 要除 0.94 还原采样半径） */
+  window.__radii = ps.map(function (q) {
+    var dx = q.x - 100, dy = (q.y - 100) / (DIST === 'annulus' ? 1 : 0.94);
+    return Math.sqrt(dx * dx + dy * dy);
+  });
+})();
+
+/* ---------- OK 扩散环 ---------- */
+var b = null;
+if (STATE === 'OK') {
+  b = document.getElementById('burst');
+  var NS2 = 'http://www.w3.org/2000/svg';
+  var ring = document.createElementNS(NS2, 'circle');
+  ring.setAttribute('cx', '100'); ring.setAttribute('cy', '100'); ring.setAttribute('r', '34');
+  ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', sp.c1); ring.setAttribute('stroke-width', '2');
+  b.appendChild(ring);
+  b.setAttribute('opacity', '0');
+}
+
+/* ---------- 动画相位冻结：全部由 t 决定，与页面加载时刻无关 ---------- */
+var spinSeg = document.getElementById('spinSeg');
+var coreWrap = document.getElementById('coreWrap');
+function frame() {
+  var ang = pp.period > 0 ? (T / pp.period) * 360 : 0;
+  document.getElementById('cloud').setAttribute('transform', ang ? ('rotate(' + ang.toFixed(3) + ' 100 100)') : '');
+  spinSeg.setAttribute('transform', 'rotate(' + ang.toFixed(3) + ' 100 100)');
+  var cg = document.getElementById('coreGlow');
+  var dx = 0, coreOp = sp.core, glowOp = sp.core * 0.2, bufOp = 0, bufR = 34, bp = 0;
+  if (FX) {
+    if (STATE === 'WAIT') {
+      var ph = 0.5 - 0.5 * Math.cos((T / 1.9) * Math.PI * 2);     // 0..1，1.9s 呼吸
+      glowOp = sp.core * (0.2 + 0.8 * ph);                          // glow 6px↔20px
+      cg.setAttribute('filter', 'url(#soft' + (ph > 0.5 ? 4 : 2) + 'b)');
+      coreOp = sp.core * (0.82 + 0.18 * ph);
+    } else if (STATE === 'THINK') {
+      var ph2 = 0.5 - 0.5 * Math.cos((T / 3.0) * Math.PI * 2);
+      coreOp = sp.core * (0.94 + 0.06 * ph2);                      // 轻微呼吸
+    } else if (STATE === 'ERR') {
+      var seq = [0, 1, 0, -1, 0, 1, 0, -1, 0];                     // 左右抖动 3 次，每次 ±2px / 80ms
+      var seg = Math.floor(T / 0.08);
+      dx = seg < seq.length ? seq[seg] * 2 : 0;
+    } else if (STATE === 'OK') {
+      if (T < 0.15) coreOp = Math.min(1.2, sp.core * (1 + 0.35 * Math.sin((T / 0.15) * Math.PI)));
+      bp = Math.min(1, Math.max(0, T / 1.2));
+      if (T >= 0 && T <= 1.2) { bufR = 34 + 62 * bp; bufOp = 0.9 * (1 - bp); }
+    }
+  }
+  coreWrap.setAttribute('transform', dx ? ('translate(' + dx + ' 0)') : '');
+  coreWrap.querySelectorAll('*').forEach(function (e) { e.setAttribute('opacity', String(Math.min(1, coreOp))); });
+  cg.setAttribute('opacity', String(Math.min(1, glowOp)));
+  if (b) {
+    b.setAttribute('opacity', String(bufOp));
+    var rc = b.firstChild;
+    if (rc) { rc.setAttribute('r', bufR.toFixed(2)); rc.setAttribute('stroke-width', String((2 * (1 - bp * 0.7)).toFixed(2))); }
+  }
+}
+/* WAIT 需要额外的 4px 模糊档 */
+(function addBreathFilters() {
+  var defs = svg.querySelector('defs');
+  var NS3 = 'http://www.w3.org/2000/svg';
+  [[2, 6], [4, 20]].forEach(function (pair) {
+    var f = document.createElementNS(NS3, 'filter');
+    f.setAttribute('id', 'soft' + pair[0] + 'b');
+    f.setAttribute('x', '-60%'); f.setAttribute('y', '-60%');
+    f.setAttribute('width', '220%'); f.setAttribute('height', '220%');
+    var g = document.createElementNS(NS3, 'feGaussianBlur');
+    g.setAttribute('stdDeviation', String(pair[1] / 2));
+    f.appendChild(g); defs.appendChild(f);
+  });
+})();
+frame();
+/* 供导图脚本轮询：渲染完成 */
+window.__goldenReady = true;
+window.__golden = { state: STATE, size: SIZE, bg: BG, t: T, dist: DIST, particles: pp.n, radiusBand: pp.R, viewBox: '0 0 200 200' };
+</script>
+</body>
+</html>
